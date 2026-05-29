@@ -8,6 +8,7 @@ bin/
 .poko/history/
 .poko/handoffs/
 .poko/native/
+.poko/backups/
 .research/
 
 # Local lab state must stay private; auth baselines live outside the repo by default.

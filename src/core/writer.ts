@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   FileOperation,
@@ -20,10 +20,14 @@ export type WriteResult = {
   path: string;
   label: string;
   action: WriteAction;
+  backupPath?: string;
+  diff?: string;
 };
 
 export type WriteOptions = {
   dryRun?: boolean;
+  backup?: boolean;
+  showDiff?: boolean;
 };
 
 export const applyWritePlan = async (
@@ -55,6 +59,9 @@ const applyOperation = async (
       path: operation.path,
       label: operation.label,
       action: "unchanged",
+      diff: options.showDiff
+        ? renderDiff(current, next, operation.path)
+        : undefined,
     };
   }
 
@@ -63,14 +70,23 @@ const applyOperation = async (
       path: operation.path,
       label: operation.label,
       action: existed ? "would-update" : "would-create",
+      diff: options.showDiff
+        ? renderDiff(current, next, operation.path)
+        : undefined,
     };
   }
+
+  const backupPath =
+    options.backup && existed
+      ? await backupExisting(root, destination)
+      : undefined;
 
   await writeAtomic(destination, next);
   return {
     path: operation.path,
     label: operation.label,
     action: existed ? "updated" : "created",
+    backupPath,
   };
 };
 
@@ -212,5 +228,53 @@ const writeAtomic = async (
   await rename(temporary, destination);
 };
 
+const backupExisting = async (
+  root: string,
+  destination: string,
+): Promise<string> => {
+  const relative = path.relative(root, destination);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = path.join(root, ".poko", "backups", timestamp, relative);
+
+  await mkdir(path.dirname(backupPath), { recursive: true });
+  await copyFile(destination, backupPath);
+
+  return path.relative(root, backupPath);
+};
+
 const ensureTrailingNewline = (content: string): string =>
   content.endsWith("\n") ? content : `${content}\n`;
+
+const renderDiff = (
+  current: string,
+  next: string,
+  filePath: string,
+): string => {
+  if (current === next) {
+    return "";
+  }
+
+  const before = current.split("\n");
+  const after = next.split("\n");
+  const rows = [`--- ${filePath}`, `+++ ${filePath}`];
+  const max = Math.max(before.length, after.length);
+
+  for (let index = 0; index < max; index += 1) {
+    const left = before[index];
+    const right = after[index];
+
+    if (left === right) {
+      continue;
+    }
+
+    if (left !== undefined) {
+      rows.push(`- ${left}`);
+    }
+
+    if (right !== undefined) {
+      rows.push(`+ ${right}`);
+    }
+  }
+
+  return rows.join("\n");
+};

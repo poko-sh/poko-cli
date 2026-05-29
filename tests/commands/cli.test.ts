@@ -20,6 +20,15 @@ describe("cli", () => {
     expect(logger.messages.join("\n")).toContain("native sync dry-run");
   });
 
+  test("shows command help for status --help", async () => {
+    const logger = createMemoryLogger();
+    const code = await run(["status", "--help"], process.cwd(), logger);
+
+    expect(code).toBe(0);
+    expect(logger.messages.join("\n")).toContain("poko status");
+    expect(logger.messages.join("\n")).toContain("compact readiness summary");
+  });
+
   test("returns an error for unknown commands", async () => {
     await expect(
       run(["nope"], process.cwd(), createMemoryLogger()),

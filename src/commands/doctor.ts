@@ -15,12 +15,13 @@ import { buildProjectHistorySync } from "../history/project-sync.ts";
 export type DoctorOptions = {
   cwd: string;
   logger: Logger;
+  compact?: boolean;
 };
 
 export const runDoctor = async (options: DoctorOptions): Promise<void> => {
   const root = path.resolve(options.cwd);
 
-  options.logger.plain("poko doctor");
+  options.logger.plain(options.compact ? "poko status" : "poko doctor");
 
   if (!(await pathExists(path.join(root, POKO_DIR, "poko.json")))) {
     options.logger.warn("this project is not initialized. Run `poko init`.");
@@ -52,12 +53,65 @@ export const runDoctor = async (options: DoctorOptions): Promise<void> => {
     dryRun: true,
   });
 
+  if (options.compact) {
+    reportStatusSummary(
+      context,
+      detections,
+      historySnapshot,
+      nativeTargets,
+      options.logger,
+    );
+    return;
+  }
+
   reportProject(context, options.logger);
   await reportSourceContext(context, options.logger);
   reportAdapters(detections, options.logger);
   reportHistory(context, historySnapshot, options.logger);
   reportNativeTargets(nativeTargets, options.logger);
   reportWarnings(context, options.logger);
+};
+
+const reportStatusSummary = (
+  context: PokoContext,
+  detections: Array<{
+    adapter: (typeof ADAPTERS)[number];
+    detection: Awaited<ReturnType<(typeof ADAPTERS)[number]["detect"]>>;
+    enabled: boolean;
+  }>,
+  historySnapshot: Awaited<ReturnType<typeof buildProjectHistorySync>>,
+  nativeTargets: Awaited<ReturnType<typeof syncNativeHistoryTargets>>,
+  logger: Logger,
+): void => {
+  const presentSections = Object.entries(context.sections).filter(([, value]) =>
+    value.trim(),
+  ).length;
+  const mcpCount = Object.keys(context.mcpServers).length;
+  const enabledAdapters = detections.filter(({ enabled }) => enabled).length;
+  const detectedAdapters = detections.filter(
+    ({ enabled, detection }) => enabled && detection.detected,
+  ).length;
+  const nativeReady = nativeTargets.filter((target) => !target.skipped).length;
+  const nativeSkipped = nativeTargets.length - nativeReady;
+
+  logger.plain(`  project: ${context.config.project.id || "(unset)"}`);
+  logger.plain(`  root: ${context.root}`);
+  logger.plain(
+    `  source context: ${presentSections} text file(s), ${mcpCount} MCP server(s), ${context.skills.length} skill(s)`,
+  );
+  logger.plain(
+    `  adapters: ${enabledAdapters} enabled, ${detectedAdapters} detected here`,
+  );
+  logger.plain(
+    `  history: ${historySnapshot.sessions.length} current session(s), ${historySnapshot.skipped.length} older same-path skipped`,
+  );
+  logger.plain(
+    `  native sync: ${nativeReady} ready, ${nativeSkipped} skipped in dry-run`,
+  );
+
+  if (context.warnings.length > 0) {
+    logger.plain(`  warnings: ${context.warnings.length}`);
+  }
 };
 
 const reportProject = (context: PokoContext, logger: Logger): void => {

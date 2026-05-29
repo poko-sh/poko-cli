@@ -21,6 +21,8 @@ export type SyncOptions = {
   all?: boolean;
   dryRun?: boolean;
   noHistory?: boolean;
+  backup?: boolean;
+  diff?: boolean;
   logger: Logger;
 };
 
@@ -54,6 +56,8 @@ export const runSync = async (options: SyncOptions): Promise<WriteResult[]> => {
   const operations = dedupeOperations([...adapterOperations]);
   const results = await applyWritePlan(context.root, operations, {
     dryRun: options.dryRun,
+    backup: options.backup,
+    showDiff: options.diff,
   });
 
   reportWriteResults(results, options.logger, options.dryRun ?? false);
@@ -193,6 +197,14 @@ const reportWriteResults = (
   for (const result of results) {
     const prefix = result.action.replace("-", " ");
     logger.info(`${prefix}: ${result.path} (${result.label})`);
+
+    if (result.backupPath) {
+      logger.info(`  backup: ${result.backupPath}`);
+    }
+
+    if (result.diff) {
+      logger.plain(result.diff);
+    }
   }
 
   const changed = results.filter(

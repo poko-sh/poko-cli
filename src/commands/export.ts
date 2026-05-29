@@ -17,6 +17,8 @@ export type ExportOptions = {
   agent?: string;
   stdout?: boolean;
   dryRun?: boolean;
+  backup?: boolean;
+  diff?: boolean;
   logger: Logger;
 };
 
@@ -52,11 +54,21 @@ export const runExport = async (
 
   const results = await applyWritePlan(context.root, operations, {
     dryRun: options.dryRun,
+    backup: options.backup,
+    showDiff: options.diff,
   });
 
   for (const result of results) {
     const prefix = result.action.replace("-", " ");
     options.logger.info(`${prefix}: ${result.path} (${result.label})`);
+
+    if (result.backupPath) {
+      options.logger.info(`  backup: ${result.backupPath}`);
+    }
+
+    if (result.diff) {
+      options.logger.plain(result.diff);
+    }
   }
 
   return results;

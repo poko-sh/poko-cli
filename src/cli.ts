@@ -53,6 +53,8 @@ export const run = async (
         all: Boolean(parsed.flags.all),
         dryRun: Boolean(parsed.flags["dry-run"]),
         noHistory: Boolean(parsed.flags["no-history"]),
+        backup: Boolean(parsed.flags.backup),
+        diff: Boolean(parsed.flags.diff),
         logger,
       });
       return 0;
@@ -67,6 +69,8 @@ export const run = async (
         agent: parsed.positional[0],
         stdout: Boolean(parsed.flags.stdout),
         dryRun: Boolean(parsed.flags["dry-run"]),
+        backup: Boolean(parsed.flags.backup),
+        diff: Boolean(parsed.flags.diff),
         logger,
       });
       return 0;
@@ -107,6 +111,18 @@ export const run = async (
       await runDoctor({
         cwd,
         logger,
+      });
+      return 0;
+    case "status":
+      if (parsed.flags.help || parsed.flags.h) {
+        logger.plain(statusHelpText());
+        return 0;
+      }
+
+      await runDoctor({
+        cwd,
+        logger,
+        compact: true,
       });
       return 0;
     case "handoff":
@@ -185,10 +201,11 @@ export const helpText =
 
 Usage:
   poko init [--yes] [--force]
-  poko sync [--all] [--agent <agent>] [--dry-run] [--no-history]
-  poko export <agent> [--stdout] [--dry-run]
+  poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history]
+  poko export <agent> [--stdout] [--dry-run] [--diff] [--backup]
   poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--include-previous]
   poko history [--store local|repo|both]
+  poko status
   poko doctor
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
 
@@ -201,6 +218,7 @@ Aliases:
 Examples:
   poko init
   poko sync --all
+  poko status
   poko doctor
   poko capture --all
   poko handoff cursor --stdout
@@ -218,12 +236,14 @@ Options:
 
 const syncHelpText = (): string => `${pc.bold("poko sync")}
 
-Detects installed/configured agents and writes their project context files.
+Detects installed/configured agents and writes their project context files and native chat history.
 
 Options:
   --all             Sync every enabled adapter
   --agent <agent>   Sync one adapter
   --dry-run         Show what would change without writing files
+  --diff            With --dry-run, print line-level static file changes
+  --backup          Back up overwritten static files under .poko/backups/
   --no-history      Skip project chat/session history sync
 `;
 
@@ -234,6 +254,8 @@ Renders one target agent without requiring the agent to be installed.
 Options:
   --stdout          Print generated files instead of writing them
   --dry-run         Show what would change without writing files
+  --diff            With --dry-run, print line-level static file changes
+  --backup          Back up overwritten files under .poko/backups/
 `;
 
 const captureHelpText = (): string => `${pc.bold("poko capture [agent]")}
@@ -262,6 +284,12 @@ Options:
 const doctorHelpText = (): string => `${pc.bold("poko doctor")}
 
 Checks project context sources, adapter detection, captured history, and native sync dry-run details.
+`;
+
+const statusHelpText = (): string => `${pc.bold("poko status")}
+
+Shows a compact readiness summary for the current project.
+Use \`poko doctor\` when you want the full adapter and native sync report.
 `;
 
 const handoffHelpText = (): string => `${pc.bold("poko handoff <agent>")}

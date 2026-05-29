@@ -95,6 +95,24 @@ describe("poko doctor", () => {
   });
 });
 
+describe("poko status", () => {
+  test("reports a compact project readiness summary", async () => {
+    await configureRepoHistoryStore();
+    await seedCodexSession();
+    const logger = createMemoryLogger();
+
+    await runDoctor({ cwd, logger, compact: true });
+
+    const output = logger.messages.join("\n");
+    expect(output).toContain("poko status");
+    expect(output).toContain("source context:");
+    expect(output).toContain("adapters:");
+    expect(output).toContain("history: 1 current session");
+    expect(output).toContain("native sync:");
+    expect(output).not.toContain("Native Sync Dry Run");
+  });
+});
+
 const configureRepoHistoryStore = async (): Promise<void> => {
   const configPath = path.join(cwd, ".poko/poko.json");
   const config = JSON.parse(await readFile(configPath, "utf8")) as {

@@ -2,9 +2,11 @@
 
 Your pocket context buddy for AI coding agents.
 
+**Same conversation everywhere.**
+
 Poko keeps one canonical `.poko/` folder in your project and syncs it into the files different coding agents expect: `CLAUDE.md`, Cursor rules, `AGENTS.md`, `GEMINI.md`, agent skills, and local MCP configs.
 
-It can also capture local chat/session history from coding agents into a portable Poko history store, then render handoffs for whichever agent you are switching to next.
+It can also move project chat/session history into native agent history so a working conversation can follow you from one coding agent to the next.
 
 ## Quick Start
 
@@ -12,6 +14,7 @@ It can also capture local chat/session history from coding agents into a portabl
 bun install
 bun src/cli.ts init
 # add .poko/rules.md, .poko/mcp.json, or other source context when you need it
+bun src/cli.ts status
 bun src/cli.ts sync --all
 ```
 
@@ -19,10 +22,11 @@ bun src/cli.ts sync --all
 
 ```sh
 poko init [--yes] [--force]
-poko sync [--all] [--agent <agent>] [--dry-run] [--no-history]
-poko export <agent> [--stdout] [--dry-run]
+poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history]
+poko export <agent> [--stdout] [--dry-run] [--diff] [--backup]
 poko capture [agent|--all] [--store local|repo|both] [--dry-run]
 poko history [--store local|repo|both]
+poko status
 poko doctor
 poko handoff <agent> [--stdout] [--raw] [--limit 5]
 ```
@@ -78,6 +82,8 @@ Project sync also captures project-scoped chat/session history from enabled loca
 
 `poko sync --dry-run` prints the specific project sessions it would include, each native target location, and target-specific details such as stale imports removed, files written, import commands run, and same-agent sessions skipped.
 
+Use `poko sync --dry-run --diff` when you want to preview static file edits line by line. Use `poko sync --backup` or `poko export <agent> --backup` when overwriting existing static files; backups are written under `.poko/backups/` and ignored by default.
+
 ## History Capture
 
 Poko can capture raw project history from:
@@ -106,7 +112,13 @@ poko handoff cursor --stdout
 poko handoff claude --raw --limit 3
 ```
 
-## Doctor
+## Status And Doctor
+
+`poko status` is the everyday readiness check. It gives a compact summary of source context, enabled/detected adapters, current project history, and native sync readiness:
+
+```sh
+poko status
+```
 
 `poko doctor` is the quickest way to inspect whether a project is ready to sync. It reports:
 
@@ -168,3 +180,5 @@ bun run compile
 ## Open Core
 
 Local `init`, `sync`, `export`, `capture`, `history`, and `handoff` are free forever. Pro features such as always-on background capture, cloud sync, AI translation, analytics, marketplace, memory server, and teams are isolated behind a simple license gate for future work.
+
+The open-source CLI stays local-first. The future paid app can sit on top of the same sync engine: macOS first, cross-platform once the desktop shell and agent-lifecycle handling are proven. See `docs/product-roadmap.md` for the product boundary.

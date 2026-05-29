@@ -114,4 +114,50 @@ describe("writer", () => {
     expect(results[0]?.action).toBe("would-create");
     expect(await Bun.file(path.join(cwd, "CLAUDE.md")).exists()).toBe(false);
   });
+
+  test("can include a static file diff in dry-run output", async () => {
+    await writeFile(path.join(cwd, "AGENTS.md"), "old\n", "utf8");
+
+    const results = await applyWritePlan(
+      cwd,
+      [
+        {
+          type: "replace",
+          path: "AGENTS.md",
+          content: "new\n",
+          label: "replace",
+        },
+      ],
+      { dryRun: true, showDiff: true },
+    );
+
+    expect(results[0]?.diff).toContain("--- AGENTS.md");
+    expect(results[0]?.diff).toContain("- old");
+    expect(results[0]?.diff).toContain("+ new");
+    expect(await readFile(path.join(cwd, "AGENTS.md"), "utf8")).toBe("old\n");
+  });
+
+  test("backs up an existing static file before writing", async () => {
+    await writeFile(path.join(cwd, "AGENTS.md"), "old\n", "utf8");
+
+    const results = await applyWritePlan(
+      cwd,
+      [
+        {
+          type: "replace",
+          path: "AGENTS.md",
+          content: "new\n",
+          label: "replace",
+        },
+      ],
+      { backup: true },
+    );
+
+    const backupPath = results[0]?.backupPath;
+    expect(backupPath).toStartWith(".poko/backups/");
+    expect(await readFile(path.join(cwd, backupPath ?? ""), "utf8")).toBe(
+      "old\n",
+    );
+    expect(await readFile(path.join(cwd, "AGENTS.md"), "utf8")).toBe("new\n");
+  });
 });
