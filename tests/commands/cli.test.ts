@@ -11,6 +11,15 @@ describe("cli", () => {
     expect(logger.messages.join("\n")).toContain("poko init");
   });
 
+  test("shows command help for doctor --help", async () => {
+    const logger = createMemoryLogger();
+    const code = await run(["doctor", "--help"], process.cwd(), logger);
+
+    expect(code).toBe(0);
+    expect(logger.messages.join("\n")).toContain("poko doctor");
+    expect(logger.messages.join("\n")).toContain("native sync dry-run");
+  });
+
   test("returns an error for unknown commands", async () => {
     await expect(
       run(["nope"], process.cwd(), createMemoryLogger()),

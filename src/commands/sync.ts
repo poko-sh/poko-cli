@@ -8,10 +8,12 @@ import {
 import { loadPokoContext, type PokoConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import { applyWritePlan, type WriteResult } from "../core/writer.ts";
+import { formatNativeDetails } from "../history/native/format.ts";
 import {
   buildProjectHistorySync,
   type ProjectHistorySyncResult,
 } from "../history/project-sync.ts";
+import type { RawHistorySession } from "../history/types.ts";
 
 export type SyncOptions = {
   cwd: string;
@@ -85,6 +87,10 @@ const reportHistorySync = (
     logger.info(
       `${dryRun ? "would include" : "included"} ${result.sessions.length} project history session(s).`,
     );
+
+    if (dryRun) {
+      reportHistorySessions(result.sessions, logger);
+    }
   }
 
   for (const nativeTarget of result.nativeTargets) {
@@ -92,11 +98,21 @@ const reportHistorySync = (
       logger.warn(
         `${nativeTarget.target} native chat sync skipped: ${nativeTarget.reason ?? "unknown reason"}`,
       );
+      reportNativeTargetDetails(
+        nativeTarget.location,
+        nativeTarget.details,
+        logger,
+      );
       continue;
     }
 
     logger.info(
       `${dryRun ? "would sync" : "synced"} ${nativeTarget.sessions} session(s), ${nativeTarget.messages} message(s) into ${nativeTarget.target} native history.`,
+    );
+    reportNativeTargetDetails(
+      nativeTarget.location,
+      nativeTarget.details,
+      logger,
     );
   }
 
@@ -104,6 +120,39 @@ const reportHistorySync = (
     logger.info(
       `skipped ${result.skipped.length} older same-path history session(s) from before this .poko project was initialized.`,
     );
+  }
+};
+
+const reportHistorySessions = (
+  sessions: RawHistorySession[],
+  logger: Logger,
+): void => {
+  for (const session of sessions) {
+    logger.plain(
+      [
+        `- ${session.title}`,
+        `  source: ${session.sourceAgent}`,
+        `  id: ${session.id}`,
+        `  messages: ${session.messages.length}`,
+        session.updatedAt ? `  updated: ${session.updatedAt}` : undefined,
+        session.sourcePath ? `  path: ${session.sourcePath}` : undefined,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+};
+
+const reportNativeTargetDetails = (
+  location: string,
+  details: Record<string, number | string | boolean> | undefined,
+  logger: Logger,
+): void => {
+  logger.info(`  location: ${location}`);
+  const formatted = formatNativeDetails(details);
+
+  if (formatted) {
+    logger.info(`  details: ${formatted}`);
   }
 };
 
@@ -198,12 +247,6 @@ const operationIdentity = (operation: FileOperation): string => {
         path: operation.path,
         merge: operation.merge,
         arrayUnion: operation.arrayUnion,
-      });
-    case "yaml-read-list":
-      return JSON.stringify({
-        type: operation.type,
-        path: operation.path,
-        readFiles: operation.readFiles,
       });
   }
 };

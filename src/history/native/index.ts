@@ -3,6 +3,7 @@ import { claudeNativeSyncer } from "./claude.ts";
 import { codexNativeSyncer } from "./codex.ts";
 import { cursorNativeSyncer } from "./cursor.ts";
 import { openCodeNativeSyncer } from "./opencode.ts";
+import { piNativeSyncer } from "./pi.ts";
 import { t3CodeNativeSyncer } from "./t3code.ts";
 import type {
   NativeHistorySyncer,
@@ -15,6 +16,7 @@ const NATIVE_HISTORY_SYNCERS: NativeHistorySyncer[] = [
   cursorNativeSyncer,
   t3CodeNativeSyncer,
   openCodeNativeSyncer,
+  piNativeSyncer,
   codexNativeSyncer,
 ];
 

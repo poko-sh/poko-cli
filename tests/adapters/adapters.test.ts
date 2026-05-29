@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { aiderAdapter } from "../../src/adapters/aider.ts";
 import { antigravityAdapter } from "../../src/adapters/antigravity.ts";
 import { claudeAdapter } from "../../src/adapters/claude.ts";
 import { codexAdapter } from "../../src/adapters/codex.ts";
 import { copilotAdapter } from "../../src/adapters/copilot.ts";
 import { cursorAdapter } from "../../src/adapters/cursor.ts";
-import { geminiAdapter } from "../../src/adapters/gemini.ts";
 import { openCodeAdapter } from "../../src/adapters/opencode.ts";
+import { piAdapter } from "../../src/adapters/pi.ts";
 import { t3CodeAdapter } from "../../src/adapters/t3code.ts";
 import { runInit } from "../../src/commands/init.ts";
 import { loadPokoContext } from "../../src/core/config.ts";
@@ -83,30 +82,6 @@ describe("agent adapters", () => {
     );
   });
 
-  test("renders Aider conventions and read config", async () => {
-    const context = await loadPokoContext(cwd);
-    const operations = aiderAdapter.render(context, { config: context.config });
-
-    expect(operations.map((operation) => operation.path)).toEqual([
-      "CONVENTIONS.md",
-      ".aider.conf.yml",
-    ]);
-  });
-
-  test("renders Gemini context and workspace settings", async () => {
-    const context = await loadPokoContext(cwd);
-    const operations = geminiAdapter.render(context, {
-      config: context.config,
-    });
-
-    expect(operations.map((operation) => operation.path)).toContain(
-      "GEMINI.md",
-    );
-    expect(operations.map((operation) => operation.path)).toContain(
-      ".gemini/settings.json",
-    );
-  });
-
   test("renders Antigravity GEMINI.md and workspace rule", async () => {
     const context = await loadPokoContext(cwd);
     const operations = antigravityAdapter.render(context, {
@@ -158,6 +133,20 @@ describe("agent adapters", () => {
     );
     expect(operations.map((operation) => operation.path)).toContain(
       ".agents/skills/reviewer/SKILL.md",
+    );
+  });
+
+  test("renders Pi AGENTS.md and skills", async () => {
+    const context = await loadPokoContext(cwd);
+    const operations = piAdapter.render(context, {
+      config: context.config,
+    });
+
+    expect(operations.map((operation) => operation.path)).toContain(
+      "AGENTS.md",
+    );
+    expect(operations.map((operation) => operation.path)).toContain(
+      ".pi/skills/reviewer/SKILL.md",
     );
   });
 

@@ -3,12 +3,11 @@ import type { PokoConfig, PokoContext } from "../core/config.ts";
 export const AGENT_IDS = [
   "claude",
   "cursor",
-  "aider",
   "antigravity",
   "copilot",
   "t3code",
   "opencode",
-  "gemini",
+  "pi",
   "codex",
 ] as const;
 
@@ -18,10 +17,10 @@ const AGENT_ALIASES: Record<string, AgentId> = {
   ag: "antigravity",
   agy: "antigravity",
   google: "antigravity",
-  "gemini-cli": "gemini",
   "github-copilot": "copilot",
   oc: "opencode",
   "open-code": "opencode",
+  "pi-coding-agent": "pi",
   t3: "t3code",
   "t3-code": "t3code",
   vscode: "copilot",
@@ -76,12 +75,6 @@ export type FileOperation =
       path: string;
       merge: JsonObject;
       arrayUnion?: Record<string, string[]>;
-      label: string;
-    }
-  | {
-      type: "yaml-read-list";
-      path: string;
-      readFiles: string[];
       label: string;
     };
 

@@ -1,6 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import YAML from "yaml";
 import type {
   FileOperation,
   JsonObject,
@@ -91,8 +90,6 @@ const renderNextContent = async (
       return ensureTrailingNewline(operation.content);
     case "json-merge":
       return renderMergedJson(current, operation.merge, operation.arrayUnion);
-    case "yaml-read-list":
-      return renderYamlReadList(current, operation.readFiles);
   }
 };
 
@@ -139,14 +136,6 @@ const renderMergedJson = (
   return stringifyJson(merged);
 };
 
-const renderYamlReadList = (current: string, readFiles: string[]): string => {
-  const existing = current.trim() ? parseYamlObject(current) : {};
-  const existingRead = normalizeReadList(existing.read);
-  const read = [...new Set([...existingRead, ...readFiles])];
-
-  return YAML.stringify({ ...existing, read });
-};
-
 const parseJsonObject = (content: string): JsonObject => {
   const parsed = JSON.parse(content) as JsonValue;
 
@@ -155,32 +144,6 @@ const parseJsonObject = (content: string): JsonObject => {
   }
 
   return parsed;
-};
-
-const parseYamlObject = (content: string): Record<string, unknown> => {
-  const parsed = YAML.parse(content) as unknown;
-
-  if (parsed === null || parsed === undefined) {
-    return {};
-  }
-
-  if (typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Expected YAML config to be an object.");
-  }
-
-  return parsed as Record<string, unknown>;
-};
-
-const normalizeReadList = (value: unknown): string[] => {
-  if (typeof value === "string") {
-    return [value];
-  }
-
-  if (Array.isArray(value)) {
-    return value.filter((entry): entry is string => typeof entry === "string");
-  }
-
-  return [];
 };
 
 const deepMerge = (left: JsonObject, right: JsonObject): JsonObject => {

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import pc from "picocolors";
 import { runCapture } from "./commands/capture.ts";
+import { runDoctor } from "./commands/doctor.ts";
 import { runExport } from "./commands/export.ts";
 import { runHandoff } from "./commands/handoff.ts";
 import { runHistory } from "./commands/history.ts";
@@ -21,7 +22,7 @@ export const run = async (
 ): Promise<number> => {
   const parsed = parseArgs(argv);
 
-  if (!parsed.command || parsed.flags.help || parsed.flags.h) {
+  if (!parsed.command) {
     logger.plain(helpText());
     return 0;
   }
@@ -94,6 +95,17 @@ export const run = async (
       await runHistory({
         cwd,
         store: flagString(parsed.flags.store),
+        logger,
+      });
+      return 0;
+    case "doctor":
+      if (parsed.flags.help || parsed.flags.h) {
+        logger.plain(doctorHelpText());
+        return 0;
+      }
+
+      await runDoctor({
+        cwd,
         logger,
       });
       return 0;
@@ -177,17 +189,19 @@ Usage:
   poko export <agent> [--stdout] [--dry-run]
   poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--include-previous]
   poko history [--store local|repo|both]
+  poko doctor
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
 
 Agents:
-  claude, cursor, aider, antigravity, copilot, t3code, opencode, gemini, codex
+  claude, cursor, antigravity, copilot, t3code, opencode, pi, codex
 
 Aliases:
-  agy -> antigravity, vscode -> copilot, t3 -> t3code, oc -> opencode
+  agy -> antigravity, vscode -> copilot, t3 -> t3code, oc -> opencode, pi-coding-agent -> pi
 
 Examples:
   poko init
   poko sync --all
+  poko doctor
   poko capture --all
   poko handoff cursor --stdout
   poko export antigravity --stdout
@@ -210,7 +224,7 @@ Options:
   --all             Sync every enabled adapter
   --agent <agent>   Sync one adapter
   --dry-run         Show what would change without writing files
-  --no-history      Skip project chat/session history handoff generation
+  --no-history      Skip project chat/session history sync
 `;
 
 const exportHelpText = (): string => `${pc.bold("poko export <agent>")}
@@ -227,7 +241,7 @@ const captureHelpText = (): string => `${pc.bold("poko capture [agent]")}
 Captures raw local chat/session history for this project.
 
 Agents:
-  codex, claude, cursor
+  codex, claude, cursor, pi
 
 Options:
   --all             Capture every enabled history importer
@@ -243,6 +257,11 @@ Lists captured project sessions.
 
 Options:
   --store <store>   local, repo, or both
+`;
+
+const doctorHelpText = (): string => `${pc.bold("poko doctor")}
+
+Checks project context sources, adapter detection, captured history, and native sync dry-run details.
 `;
 
 const handoffHelpText = (): string => `${pc.bold("poko handoff <agent>")}

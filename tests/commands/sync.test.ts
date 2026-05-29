@@ -11,8 +11,10 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { runCapture } from "../../src/commands/capture.ts";
 import { runInit } from "../../src/commands/init.ts";
 import { runSync } from "../../src/commands/sync.ts";
+import { syncNativeHistoryTargets } from "../../src/history/native/index.ts";
 import {
   syncT3CodeNativeHistory,
   type T3CodeAppController,
@@ -26,6 +28,7 @@ let claudeHome: string;
 let cursorStorage: string;
 let cursorGlobalStateDbPath: string;
 let t3DbPath: string;
+let piHome: string;
 let oldCodexHome: string | undefined;
 let oldClaudeHome: string | undefined;
 let oldClaudeConfigDir: string | undefined;
@@ -36,6 +39,8 @@ let oldT3CodeDbPath: string | undefined;
 let oldT3CodeSkipAppLifecycle: string | undefined;
 let oldOpenCodeBin: string | undefined;
 let oldOpenCodeImportModel: string | undefined;
+let oldPiAgentDir: string | undefined;
+let oldPiImportModel: string | undefined;
 
 beforeEach(async () => {
   cwd = await makeTempDir();
@@ -44,6 +49,7 @@ beforeEach(async () => {
   cursorStorage = await makeTempDir();
   cursorGlobalStateDbPath = path.join(await makeTempDir(), "state.vscdb");
   t3DbPath = path.join(await makeTempDir(), "state.sqlite");
+  piHome = await makeTempDir();
   oldCodexHome = process.env.CODEX_HOME;
   oldClaudeHome = process.env.CLAUDE_HOME;
   oldClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
@@ -54,6 +60,8 @@ beforeEach(async () => {
   oldT3CodeSkipAppLifecycle = process.env.POKO_T3CODE_SKIP_APP_LIFECYCLE;
   oldOpenCodeBin = process.env.POKO_OPENCODE_BIN;
   oldOpenCodeImportModel = process.env.POKO_OPENCODE_IMPORT_MODEL;
+  oldPiAgentDir = process.env.PI_CODING_AGENT_DIR;
+  oldPiImportModel = process.env.POKO_PI_IMPORT_MODEL;
   process.env.CODEX_HOME = codexHome;
   process.env.CLAUDE_HOME = claudeHome;
   process.env.CLAUDE_CONFIG_DIR = claudeHome;
@@ -63,6 +71,8 @@ beforeEach(async () => {
   process.env.POKO_T3CODE_DB_PATH = t3DbPath;
   process.env.POKO_T3CODE_SKIP_APP_LIFECYCLE = "1";
   process.env.POKO_OPENCODE_IMPORT_MODEL = "opencode/big-pickle";
+  process.env.PI_CODING_AGENT_DIR = piHome;
+  process.env.POKO_PI_IMPORT_MODEL = "anthropic/claude-sonnet-4-5";
   delete process.env.POKO_OPENCODE_BIN;
   createCursorGlobalStateDb(cursorGlobalStateDbPath);
   createT3CodeStateDb(t3DbPath);
@@ -96,10 +106,13 @@ afterEach(async () => {
   restoreEnv("POKO_T3CODE_SKIP_APP_LIFECYCLE", oldT3CodeSkipAppLifecycle);
   restoreEnv("POKO_OPENCODE_BIN", oldOpenCodeBin);
   restoreEnv("POKO_OPENCODE_IMPORT_MODEL", oldOpenCodeImportModel);
+  restoreEnv("PI_CODING_AGENT_DIR", oldPiAgentDir);
+  restoreEnv("POKO_PI_IMPORT_MODEL", oldPiImportModel);
   await removeTempDir(cwd);
   await removeTempDir(codexHome);
   await removeTempDir(claudeHome);
   await removeTempDir(cursorStorage);
+  await removeTempDir(piHome);
   await removeTempDir(path.dirname(cursorGlobalStateDbPath));
   await removeTempDir(path.dirname(t3DbPath));
 });
@@ -130,6 +143,7 @@ describe("poko sync", () => {
     expect(paths).toContain("AGENTS.md");
     expect(paths).toContain("opencode.json");
     expect(paths).not.toContain(".gemini/settings.json");
+    expect(paths).not.toContain(".aider.conf.yml");
   });
 
   test("supports common agent aliases", async () => {
@@ -147,6 +161,17 @@ describe("poko sync", () => {
     const results = await runSync({
       cwd,
       agent: "oc",
+      dryRun: true,
+      logger: createMemoryLogger(),
+    });
+
+    expect(results.map((result) => result.path)).toContain("AGENTS.md");
+  });
+
+  test("supports Pi aliases", async () => {
+    const results = await runSync({
+      cwd,
+      agent: "pi-coding-agent",
       dryRun: true,
       logger: createMemoryLogger(),
     });
@@ -179,6 +204,56 @@ describe("poko sync", () => {
     });
 
     expect(results.map((result) => result.path)).toEqual([".cursor/mcp.json"]);
+  });
+
+  test("dry-run includes session and native target details", async () => {
+    await configureRepoHistoryStore();
+    await seedCodexSession();
+    const logger = createMemoryLogger();
+
+    await runSync({
+      cwd,
+      agent: "claude",
+      dryRun: true,
+      logger,
+    });
+
+    const output = logger.messages.join("\n");
+    expect(output).toContain("would include 1 project history session");
+    expect(output).toContain("- Sync history");
+    expect(output).toContain("source: codex");
+    expect(output).toContain(
+      "would sync 1 session(s), 2 message(s) into claude native history",
+    );
+    expect(output).toContain("location:");
+    expect(output).toContain("details:");
+    expect(output).toContain("sessionsSkippedFromSameAgent=0");
+  });
+
+  test("dry-run reports same-agent skips for every native target", async () => {
+    const config = JSON.parse(
+      await readFile(path.join(cwd, ".poko/poko.json"), "utf8"),
+    ) as Parameters<typeof syncNativeHistoryTargets>[0]["config"];
+
+    const results = await syncNativeHistoryTargets({
+      root: cwd,
+      config,
+      targetAgents: ["codex", "claude", "cursor", "t3code", "opencode", "pi"],
+      dryRun: true,
+      sessions: [
+        makeRawSession({ id: "codex-same", sourceAgent: "codex" }),
+        makeRawSession({ id: "claude-same", sourceAgent: "claude" }),
+        makeRawSession({ id: "cursor-same", sourceAgent: "cursor" }),
+        makeRawSession({ id: "t3-same", sourceAgent: "t3code" }),
+        makeRawSession({ id: "opencode-same", sourceAgent: "opencode" }),
+        makeRawSession({ id: "pi-same", sourceAgent: "pi" }),
+      ],
+    });
+
+    for (const result of results) {
+      expect(result.details?.sessionsSkippedFromSameAgent).toBe(1);
+      expect(result.sessions).toBe(5);
+    }
   });
 
   test("syncs project history into T3 Code native history", async () => {
@@ -230,6 +305,31 @@ describe("poko sync", () => {
       ]);
     } finally {
       database.close();
+    }
+
+    await runSync({
+      cwd,
+      agent: "t3code",
+      logger: createMemoryLogger(),
+    });
+
+    const idempotentDatabase = new Database(t3DbPath, { readonly: true });
+    try {
+      expect(
+        idempotentDatabase
+          .query(
+            "select event_type, count(*) as count from orchestration_events group by event_type order by event_type",
+          )
+          .all(),
+      ).toEqual([
+        { event_type: "project.created", count: 1 },
+        { event_type: "thread.created", count: 1 },
+        { event_type: "thread.message-sent", count: 2 },
+        { event_type: "thread.turn-diff-completed", count: 1 },
+        { event_type: "thread.turn-start-requested", count: 1 },
+      ]);
+    } finally {
+      idempotentDatabase.close();
     }
   });
 
@@ -328,6 +428,26 @@ describe("poko sync", () => {
     expect(
       await readFile(path.join(codexHome, "session_index.jsonl"), "utf8"),
     ).toContain("Claude seed");
+
+    await runSync({
+      cwd,
+      agent: "codex",
+      logger: createMemoryLogger(),
+    });
+
+    const idempotentRolloutFiles = await listFiles(
+      path.join(codexHome, "sessions"),
+    );
+    expect(idempotentRolloutFiles).toHaveLength(1);
+    const indexRows = (
+      await readFile(path.join(codexHome, "session_index.jsonl"), "utf8")
+    )
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { thread_name?: string });
+    expect(
+      indexRows.filter((row) => row.thread_name === "Claude seed"),
+    ).toHaveLength(1);
   });
 
   test("syncs Codex project history into Claude native history", async () => {
@@ -370,6 +490,7 @@ describe("poko sync", () => {
   test("syncs Codex project history into Cursor native history", async () => {
     await configureRepoHistoryStore();
     await seedCodexSession();
+    await seedStalePokoCursorImport();
     const logger = createMemoryLogger();
 
     await runSync({
@@ -381,6 +502,7 @@ describe("poko sync", () => {
     expect(logger.messages.join("\n")).toContain(
       "synced 1 session(s), 2 message(s) into cursor native history",
     );
+    expect(logger.messages.join("\n")).toContain("staleComposersRemoved=1");
 
     const workspaceDirs = await readdir(cursorStorage);
     expect(workspaceDirs).toHaveLength(1);
@@ -398,6 +520,7 @@ describe("poko sync", () => {
       ) as { allComposers: Array<{ composerId: string; name: string }> };
       expect(headers.allComposers).toHaveLength(1);
       expect(headers.allComposers[0]?.name).toBe("Sync history");
+      expect(headers.allComposers[0]?.composerId).not.toBe("stale-composer");
 
       const composerId = headers.allComposers[0]?.composerId ?? "";
       const composer = JSON.parse(
@@ -427,16 +550,39 @@ describe("poko sync", () => {
         .map((bubble) => bubble.text)
         .sort();
       expect(bubbleTexts).toEqual(["history synced", "sync chats too"]);
+      expect(
+        database
+          .query("select value from cursorDiskKV where key = ?")
+          .get("composerData:stale-composer"),
+      ).toBeNull();
     } finally {
       database.close();
     }
+
+    const captureLogger = createMemoryLogger();
+    const captured = await runCapture({
+      cwd,
+      agent: "cursor",
+      store: "repo",
+      logger: captureLogger,
+    });
+    expect(captured).toBe(0);
+    expect(captureLogger.messages.join("\n")).toContain(
+      "no matching history found",
+    );
   });
 
   test("syncs project history into OpenCode through its import command", async () => {
     await configureRepoHistoryStore();
     await seedCodexSession();
     const opencodeLog = path.join(cwd, "opencode.log");
-    process.env.POKO_OPENCODE_BIN = await createFakeOpenCodeBin(opencodeLog);
+    const opencodeDbPath = path.join(cwd, "opencode-state.sqlite");
+    createOpenCodeStateDb(opencodeDbPath);
+    await seedStaleOpenCodeImport(opencodeDbPath);
+    process.env.POKO_OPENCODE_BIN = await createFakeOpenCodeBin(
+      opencodeLog,
+      opencodeDbPath,
+    );
     const logger = createMemoryLogger();
 
     await runSync({
@@ -448,6 +594,7 @@ describe("poko sync", () => {
     expect(logger.messages.join("\n")).toContain(
       "synced 1 session(s), 2 message(s) into opencode native history",
     );
+    expect(logger.messages.join("\n")).toContain("sessionsReplaced=1");
 
     const exportFiles = await listFiles(
       path.join(cwd, ".poko/native/opencode"),
@@ -486,13 +633,85 @@ describe("poko sync", () => {
     expect(await readFile(opencodeLog, "utf8")).toContain(
       `import ${exportFiles[0]}`,
     );
+
+    const database = new Database(opencodeDbPath, { readonly: true });
+    try {
+      expect(
+        database.query("select count(*) as count from session").get(),
+      ).toEqual({ count: 0 });
+      expect(
+        database.query("select count(*) as count from message").get(),
+      ).toEqual({ count: 0 });
+      expect(
+        database.query("select count(*) as count from part").get(),
+      ).toEqual({ count: 0 });
+    } finally {
+      database.close();
+    }
+  });
+
+  test("syncs Codex project history into Pi native history", async () => {
+    await configureRepoHistoryStore();
+    await seedCodexSession();
+    const canonicalCwd = await canonicalPath(cwd);
+    await seedStalePokoPiImport(canonicalCwd);
+    const logger = createMemoryLogger();
+
+    await runSync({
+      cwd,
+      agent: "pi",
+      logger,
+    });
+
+    expect(logger.messages.join("\n")).toContain(
+      "synced 1 session(s), 2 message(s) into pi native history",
+    );
+    expect(logger.messages.join("\n")).toContain("staleSessionFilesRemoved=1");
+
+    const sessionFiles = await listFiles(
+      path.join(piHome, "sessions", encodePiPath(canonicalCwd)),
+    );
+    expect(sessionFiles).toHaveLength(1);
+
+    const rows = (await readFile(sessionFiles[0] ?? "", "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(rows[0]).toMatchObject({
+      type: "session",
+      version: 3,
+      cwd: canonicalCwd,
+    });
+    expect(rows[1]).toMatchObject({
+      type: "custom",
+      customType: "poko.import",
+    });
+    expect(rows[2]).toMatchObject({
+      type: "session_info",
+      name: "Sync history",
+    });
+    expect(rows[3]).toMatchObject({
+      type: "message",
+      message: { role: "user", content: "sync chats too" },
+    });
+    expect(rows[4]).toMatchObject({
+      type: "message",
+      message: {
+        role: "assistant",
+        provider: "anthropic",
+        model: "claude-sonnet-4-5",
+      },
+    });
   });
 });
 
-const makeRawSession = (): RawHistorySession => ({
+const makeRawSession = (
+  options: { id?: string; sourceAgent?: string } = {},
+): RawHistorySession => ({
   schemaVersion: 1,
-  id: "native-close-session",
-  sourceAgent: "codex",
+  id: options.id ?? "native-close-session",
+  sourceAgent: (options.sourceAgent ??
+    "codex") as RawHistorySession["sourceAgent"],
   title: "Native close session",
   projectRoot: cwd,
   createdAt: "2026-05-29T00:00:00.000Z",
@@ -597,6 +816,78 @@ const createCursorGlobalStateDb = (dbPath: string): void => {
     database.run(
       "create table cursorDiskKV (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)",
     );
+  } finally {
+    database.close();
+  }
+};
+
+const seedStalePokoCursorImport = async (): Promise<void> => {
+  const database = new Database(cursorGlobalStateDbPath);
+
+  try {
+    const head = {
+      type: "head",
+      composerId: "stale-composer",
+      name: "Old Poko import",
+      lastUpdatedAt: Date.parse("2026-05-28T00:00:00.000Z"),
+      pokoImport: {
+        originator: "poko",
+        projectRoot: await canonicalPath(cwd),
+      },
+    };
+    database
+      .query("insert or replace into ItemTable (key, value) values (?, ?)")
+      .run(
+        "composer.composerHeaders",
+        JSON.stringify({ allComposers: [head] }),
+      );
+    database
+      .query("insert or replace into cursorDiskKV (key, value) values (?, ?)")
+      .run(
+        "composerData:stale-composer",
+        JSON.stringify({
+          composerId: "stale-composer",
+          pokoImport: {
+            originator: "poko",
+            projectRoot: await canonicalPath(cwd),
+          },
+        }),
+      );
+    database
+      .query("insert or replace into cursorDiskKV (key, value) values (?, ?)")
+      .run("bubbleId:stale-composer:old", JSON.stringify({ text: "stale" }));
+  } finally {
+    database.close();
+  }
+};
+
+const createOpenCodeStateDb = (dbPath: string): void => {
+  const database = new Database(dbPath);
+
+  try {
+    database.run(
+      "create table session (id text primary key, version text, directory text)",
+    );
+    database.run("create table message (id text primary key, session_id text)");
+    database.run("create table part (id text primary key, session_id text)");
+  } finally {
+    database.close();
+  }
+};
+
+const seedStaleOpenCodeImport = async (dbPath: string): Promise<void> => {
+  const database = new Database(dbPath);
+
+  try {
+    database
+      .query("insert into session (id, version, directory) values (?, ?, ?)")
+      .run("stale-opencode-session", "poko-import", await canonicalPath(cwd));
+    database
+      .query("insert into message (id, session_id) values (?, ?)")
+      .run("stale-opencode-message", "stale-opencode-session");
+    database
+      .query("insert into part (id, session_id) values (?, ?)")
+      .run("stale-opencode-part", "stale-opencode-session");
   } finally {
     database.close();
   }
@@ -740,6 +1031,12 @@ const listFiles = async (directory: string): Promise<string[]> => {
 const encodeClaudePath = (projectRoot: string): string =>
   projectRoot.normalize("NFC").replace(/[^a-zA-Z0-9]/g, "-");
 
+const encodePiPath = (projectRoot: string): string =>
+  `--${path
+    .resolve(projectRoot)
+    .replace(/^[/\\]/, "")
+    .replace(/[/\\:]/g, "-")}--`;
+
 const seedStalePokoClaudeImport = async (projectDir: string): Promise<void> => {
   await mkdir(projectDir, { recursive: true });
   await writeFile(
@@ -762,6 +1059,40 @@ const seedStalePokoClaudeImport = async (projectDir: string): Promise<void> => {
   );
 };
 
+const seedStalePokoPiImport = async (canonicalCwd: string): Promise<void> => {
+  const stalePath = path.join(
+    piHome,
+    "sessions",
+    encodePiPath(canonicalCwd),
+    "2026-05-28T00-00-00-000Z_ses_stale.jsonl",
+  );
+  await mkdir(path.dirname(stalePath), { recursive: true });
+  await writeFile(
+    stalePath,
+    [
+      JSON.stringify({
+        type: "session",
+        version: 3,
+        id: "ses_stale",
+        timestamp: "2026-05-28T00:00:00.000Z",
+        cwd: canonicalCwd,
+      }),
+      JSON.stringify({
+        type: "custom",
+        id: "10000000",
+        parentId: null,
+        timestamp: "2026-05-28T00:00:00.000Z",
+        customType: "poko.import",
+        data: {
+          originator: "poko",
+          projectRoot: canonicalCwd,
+        },
+      }),
+    ].join("\n"),
+    "utf8",
+  );
+};
+
 const canonicalPath = async (projectRoot: string): Promise<string> => {
   try {
     return (await realpath(projectRoot)).normalize("NFC");
@@ -770,12 +1101,23 @@ const canonicalPath = async (projectRoot: string): Promise<string> => {
   }
 };
 
-const createFakeOpenCodeBin = async (logPath: string): Promise<string> => {
+const createFakeOpenCodeBin = async (
+  logPath: string,
+  dbPath?: string,
+): Promise<string> => {
   const scriptPath = path.join(cwd, "fake-opencode");
   await writeFile(
     scriptPath,
     [
       "#!/bin/sh",
+      ...(dbPath
+        ? [
+            'if [ "$1" = "db" ] && [ "$2" = "path" ]; then',
+            `  printf '%s\\n' ${shellQuote(dbPath)}`,
+            "  exit 0",
+            "fi",
+          ]
+        : []),
       `printf '%s %s\\n' "$1" "$2" >> ${shellQuote(logPath)}`,
       "",
     ].join("\n"),

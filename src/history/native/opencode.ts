@@ -8,6 +8,7 @@ import type { RawHistoryMessage, RawHistorySession } from "../types.ts";
 import {
   conversationMessages,
   countConversationMessages,
+  countSameAgentSessions,
   dateFrom,
   deterministicPrefixedId,
   errorMessage,
@@ -70,6 +71,10 @@ export async function syncOpenCodeNativeHistory(
       details: {
         exportFilesWritten: sessions.length,
         importCommandsRun: sessions.length,
+        sessionsSkippedFromSameAgent: countSameAgentSessions(
+          options.sessions,
+          "opencode",
+        ),
       },
     };
   }
@@ -124,6 +129,10 @@ export async function syncOpenCodeNativeHistory(
           exportFilesWritten: exportFiles.length,
           importCommandsRun: importsRun,
           sessionsReplaced,
+          sessionsSkippedFromSameAgent: countSameAgentSessions(
+            options.sessions,
+            "opencode",
+          ),
         },
       };
     }
@@ -140,6 +149,10 @@ export async function syncOpenCodeNativeHistory(
       exportFilesWritten: exportFiles.length,
       importCommandsRun: importsRun,
       sessionsReplaced,
+      sessionsSkippedFromSameAgent: countSameAgentSessions(
+        options.sessions,
+        "opencode",
+      ),
     },
   };
 }

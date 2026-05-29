@@ -1,4 +1,3 @@
-import YAML from "yaml";
 import { getAdapter } from "../adapters/index.ts";
 import {
   type AgentId,
@@ -82,8 +81,6 @@ const renderOperationContent = (operation: FileOperation): string => {
       return stringifyJson(
         applyArrayUnions(operation.merge, operation.arrayUnion),
       );
-    case "yaml-read-list":
-      return YAML.stringify({ read: operation.readFiles });
   }
 };
 

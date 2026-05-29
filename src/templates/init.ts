@@ -15,9 +15,6 @@ export const DEFAULT_POKO_CONFIG = `{
       "mcp": true,
       "legacyCursorrules": false
     },
-    "aider": {
-      "enabled": true
-    },
     "antigravity": {
       "enabled": true
     },
@@ -33,9 +30,9 @@ export const DEFAULT_POKO_CONFIG = `{
       "enabled": true,
       "mcp": true
     },
-    "gemini": {
-      "enabled": false,
-      "mcp": true
+    "pi": {
+      "enabled": true,
+      "skills": true
     },
     "codex": {
       "enabled": true,
@@ -50,7 +47,8 @@ export const DEFAULT_POKO_CONFIG = `{
     "agents": {
       "codex": true,
       "claude": true,
-      "cursor": true
+      "cursor": true,
+      "pi": true
     }
   },
   "pro": {

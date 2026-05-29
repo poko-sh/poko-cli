@@ -49,15 +49,16 @@ const HistorySchema = z
         codex: z.boolean().default(true),
         claude: z.boolean().default(true),
         cursor: z.boolean().default(true),
+        pi: z.boolean().default(true),
       })
-      .default({ codex: true, claude: true, cursor: true }),
+      .default({ codex: true, claude: true, cursor: true, pi: true }),
   })
   .default({
     defaultStore: "local",
     captureRaw: true,
     includePreviousProjectIncarnations: false,
     syncOnProjectSync: true,
-    agents: { codex: true, claude: true, cursor: true },
+    agents: { codex: true, claude: true, cursor: true, pi: true },
   });
 
 const ProjectSchema = z
@@ -75,23 +76,21 @@ export const PokoConfigSchema = z
       .object({
         claude: ClaudeAdapterSchema,
         cursor: CursorAdapterSchema,
-        aider: SimpleAdapterSchema,
         antigravity: SimpleAdapterSchema,
         copilot: McpAdapterSchema,
         t3code: SkillsAdapterSchema,
         opencode: McpAdapterSchema,
-        gemini: McpAdapterSchema,
+        pi: SkillsAdapterSchema,
         codex: McpAdapterSchema,
       })
       .default({
         claude: { enabled: true, mcp: true, skills: true },
         cursor: { enabled: true, mcp: true, legacyCursorrules: false },
-        aider: { enabled: true },
         antigravity: { enabled: true },
         copilot: { enabled: true, mcp: true },
         t3code: { enabled: true, skills: true },
         opencode: { enabled: true, mcp: true },
-        gemini: { enabled: false, mcp: true },
+        pi: { enabled: true, skills: true },
         codex: { enabled: true, mcp: true },
       }),
     pro: z
@@ -110,12 +109,11 @@ export const PokoConfigSchema = z
     adapters: {
       claude: { enabled: true, mcp: true, skills: true },
       cursor: { enabled: true, mcp: true, legacyCursorrules: false },
-      aider: { enabled: true },
       antigravity: { enabled: true },
       copilot: { enabled: true, mcp: true },
       t3code: { enabled: true, skills: true },
       opencode: { enabled: true, mcp: true },
-      gemini: { enabled: false, mcp: true },
+      pi: { enabled: true, skills: true },
       codex: { enabled: true, mcp: true },
     },
     pro: { enabledFeatures: [] },
@@ -124,7 +122,7 @@ export const PokoConfigSchema = z
       captureRaw: true,
       includePreviousProjectIncarnations: false,
       syncOnProjectSync: true,
-      agents: { codex: true, claude: true, cursor: true },
+      agents: { codex: true, claude: true, cursor: true, pi: true },
     },
   });
 

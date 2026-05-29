@@ -18,11 +18,13 @@ let codexHome: string;
 let claudeHome: string;
 let cursorStorage: string;
 let cursorGlobalStateDbPath: string;
+let piHome: string;
 let oldCodexHome: string | undefined;
 let oldClaudeHome: string | undefined;
 let oldClaudeConfigDir: string | undefined;
 let oldCursorStorage: string | undefined;
 let oldCursorGlobalStateDb: string | undefined;
+let oldPiAgentDir: string | undefined;
 
 beforeEach(async () => {
   cwd = await makeTempDir();
@@ -30,16 +32,19 @@ beforeEach(async () => {
   claudeHome = await makeTempDir();
   cursorStorage = await makeTempDir();
   cursorGlobalStateDbPath = path.join(await makeTempDir(), "state.vscdb");
+  piHome = await makeTempDir();
   oldCodexHome = process.env.CODEX_HOME;
   oldClaudeHome = process.env.CLAUDE_HOME;
   oldClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
   oldCursorStorage = process.env.POKO_CURSOR_STORAGE_ROOT;
   oldCursorGlobalStateDb = process.env.POKO_CURSOR_GLOBAL_STATE_DB;
+  oldPiAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.CODEX_HOME = codexHome;
   process.env.CLAUDE_HOME = claudeHome;
   process.env.CLAUDE_CONFIG_DIR = claudeHome;
   process.env.POKO_CURSOR_STORAGE_ROOT = cursorStorage;
   process.env.POKO_CURSOR_GLOBAL_STATE_DB = cursorGlobalStateDbPath;
+  process.env.PI_CODING_AGENT_DIR = piHome;
   createCursorGlobalStateDb(cursorGlobalStateDbPath);
   await runInit({ cwd, logger: createMemoryLogger() });
   await setProjectCreatedAt("2026-01-01T00:00:00.000Z");
@@ -51,10 +56,12 @@ afterEach(async () => {
   restoreEnv("CLAUDE_CONFIG_DIR", oldClaudeConfigDir);
   restoreEnv("POKO_CURSOR_STORAGE_ROOT", oldCursorStorage);
   restoreEnv("POKO_CURSOR_GLOBAL_STATE_DB", oldCursorGlobalStateDb);
+  restoreEnv("PI_CODING_AGENT_DIR", oldPiAgentDir);
   await removeTempDir(cwd);
   await removeTempDir(codexHome);
   await removeTempDir(claudeHome);
   await removeTempDir(cursorStorage);
+  await removeTempDir(piHome);
   await removeTempDir(path.dirname(cursorGlobalStateDbPath));
 });
 
@@ -223,6 +230,32 @@ describe("history capture", () => {
     expect(sessions[0]?.messages.map((message) => message.text)).toEqual([
       "ask cursor",
       "answer cursor",
+    ]);
+  });
+
+  test("captures Pi JSONL sessions", async () => {
+    await seedPiSession();
+    await seedPiSession({
+      id: "poko-imported-pi",
+      title: "Poko imported Pi",
+      userMessage: "should not echo",
+      assistantMessage: "skip me",
+      pokoImported: true,
+    });
+
+    await runCapture({
+      cwd,
+      agent: "pi",
+      store: "repo",
+      logger: createMemoryLogger(),
+    });
+
+    const sessions = await loadHistorySessions(cwd, "repo", 1);
+    expect(sessions[0]?.sourceAgent).toBe("pi");
+    expect(sessions[0]?.title).toBe("Pi seed");
+    expect(sessions[0]?.messages.map((message) => message.text)).toEqual([
+      "ask pi",
+      "answer pi",
     ]);
   });
 
@@ -556,6 +589,95 @@ const seedCursorNativeConversation = async (): Promise<void> => {
     globalDatabase.close();
   }
 };
+
+const seedPiSession = async (
+  options: {
+    id?: string;
+    title?: string;
+    userMessage?: string;
+    assistantMessage?: string;
+    pokoImported?: boolean;
+  } = {},
+): Promise<void> => {
+  const id = options.id ?? "pi-session";
+  const sessionPath = path.join(
+    piHome,
+    "sessions",
+    encodePiPath(cwd),
+    `2026-05-29T00-00-00-000Z_${id}.jsonl`,
+  );
+  await mkdir(path.dirname(sessionPath), { recursive: true });
+  await writeFile(
+    sessionPath,
+    [
+      JSON.stringify({
+        type: "session",
+        version: 3,
+        id,
+        timestamp: "2026-05-29T00:00:00.000Z",
+        cwd,
+      }),
+      ...(options.pokoImported
+        ? [
+            JSON.stringify({
+              type: "custom",
+              id: "10000000",
+              parentId: null,
+              timestamp: "2026-05-29T00:00:00.000Z",
+              customType: "poko.import",
+              data: {
+                originator: "poko",
+                projectRoot: cwd,
+              },
+            }),
+          ]
+        : []),
+      JSON.stringify({
+        type: "session_info",
+        id: "20000000",
+        parentId: options.pokoImported ? "10000000" : null,
+        timestamp: "2026-05-29T00:00:00.000Z",
+        name: options.title ?? "Pi seed",
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "30000000",
+        parentId: "20000000",
+        timestamp: "2026-05-29T00:00:01.000Z",
+        message: {
+          role: "user",
+          content: options.userMessage ?? "ask pi",
+          timestamp: Date.parse("2026-05-29T00:00:01.000Z"),
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "40000000",
+        parentId: "30000000",
+        timestamp: "2026-05-29T00:00:02.000Z",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "text", text: options.assistantMessage ?? "answer pi" },
+          ],
+          api: "test",
+          provider: "anthropic",
+          model: "claude-sonnet-4-5",
+          usage: {},
+          stopReason: "stop",
+          timestamp: Date.parse("2026-05-29T00:00:02.000Z"),
+        },
+      }),
+    ].join("\n"),
+    "utf8",
+  );
+};
+
+const encodePiPath = (projectRoot: string): string =>
+  `--${path
+    .resolve(projectRoot)
+    .replace(/^[/\\]/, "")
+    .replace(/[/\\:]/g, "-")}--`;
 
 const createCursorGlobalStateDb = (dbPath: string): void => {
   const database = new Database(dbPath);

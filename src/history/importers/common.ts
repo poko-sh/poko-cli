@@ -80,6 +80,10 @@ export const textFromContent = (content: unknown): string => {
         return `[tool_use:${part.name}]`;
       }
 
+      if (typeof part.name === "string" && part.type === "toolCall") {
+        return `[tool_call:${part.name}]`;
+      }
+
       return "";
     })
     .filter(Boolean)

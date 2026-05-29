@@ -11,6 +11,7 @@ import {
   type NativeAppLifecycle,
   reopenAppAfterNativeSync,
 } from "./app-lifecycle.ts";
+import { countSameAgentSessions, nativeTargetSessions } from "./common.ts";
 import type {
   NativeHistorySyncer,
   NativeHistorySyncOptions,
@@ -80,8 +81,8 @@ export const syncT3CodeNativeHistory = async (
     };
   }
 
-  const sessions = options.sessions.filter((session) =>
-    session.messages.some(isImportableMessage),
+  const sessions = nativeTargetSessions(options.sessions, "t3code").filter(
+    (session) => session.messages.some(isImportableMessage),
   );
   const messageCount = sessions.reduce(
     (count, session) =>
@@ -100,6 +101,10 @@ export const syncT3CodeNativeHistory = async (
       details: {
         projectsCreated: 0,
         threadsWritten: sessions.length,
+        sessionsSkippedFromSameAgent: countSameAgentSessions(
+          options.sessions,
+          "t3code",
+        ),
       },
     };
   }
@@ -119,6 +124,10 @@ export const syncT3CodeNativeHistory = async (
         t3CodeWasRunning: lifecycle.wasRunning,
         t3CodeClosed: lifecycle.closed,
         t3CodeReopened: lifecycle.reopened,
+        sessionsSkippedFromSameAgent: countSameAgentSessions(
+          options.sessions,
+          "t3code",
+        ),
       },
     };
   }
@@ -142,6 +151,10 @@ export const syncT3CodeNativeHistory = async (
           t3CodeWasRunning: lifecycle.wasRunning,
           t3CodeClosed: lifecycle.closed,
           t3CodeReopened: lifecycle.reopened,
+          sessionsSkippedFromSameAgent: countSameAgentSessions(
+            options.sessions,
+            "t3code",
+          ),
         },
       };
     } else {
@@ -171,6 +184,10 @@ export const syncT3CodeNativeHistory = async (
           t3CodeWasRunning: lifecycle.wasRunning,
           t3CodeClosed: lifecycle.closed,
           t3CodeReopened: lifecycle.reopened,
+          sessionsSkippedFromSameAgent: countSameAgentSessions(
+            options.sessions,
+            "t3code",
+          ),
         },
       };
     }
