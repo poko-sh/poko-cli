@@ -1,13 +1,17 @@
 #!/usr/bin/env bun
 import pc from "picocolors";
-import { runCapture } from "./commands/capture.ts";
+import { runCapture, runCaptureReport } from "./commands/capture.ts";
 import { runDoctor } from "./commands/doctor.ts";
 import { runExport } from "./commands/export.ts";
 import { runHandoff } from "./commands/handoff.ts";
-import { runHistory } from "./commands/history.ts";
+import { runHistory, runHistoryReport } from "./commands/history.ts";
 import { runInit } from "./commands/init.ts";
-import { runSync } from "./commands/sync.ts";
-import { createLogger, type Logger } from "./core/logger.ts";
+import { runSync, runSyncReport } from "./commands/sync.ts";
+import {
+  createLogger,
+  createSilentLogger,
+  type Logger,
+} from "./core/logger.ts";
 
 type ParsedArgs = {
   command?: string;
@@ -21,6 +25,7 @@ export const run = async (
   logger: Logger = createLogger(),
 ): Promise<number> => {
   const parsed = parseArgs(argv);
+  const json = Boolean(parsed.flags.json);
 
   if (!parsed.command) {
     logger.plain(helpText());
@@ -44,6 +49,22 @@ export const run = async (
     case "sync":
       if (parsed.flags.help || parsed.flags.h) {
         logger.plain(syncHelpText());
+        return 0;
+      }
+
+      if (json) {
+        const report = await runSyncReport({
+          cwd,
+          agent: flagString(parsed.flags.agent),
+          all: Boolean(parsed.flags.all),
+          dryRun: Boolean(parsed.flags["dry-run"]),
+          noHistory: Boolean(parsed.flags["no-history"]),
+          backup: Boolean(parsed.flags.backup),
+          diff: Boolean(parsed.flags.diff),
+          quiet: true,
+          logger: createSilentLogger(),
+        });
+        logger.plain(toJson(report));
         return 0;
       }
 
@@ -80,6 +101,21 @@ export const run = async (
         return 0;
       }
 
+      if (json) {
+        const report = await runCaptureReport({
+          cwd,
+          agent: parsed.positional[0],
+          all: Boolean(parsed.flags.all),
+          store: flagString(parsed.flags.store),
+          dryRun: Boolean(parsed.flags["dry-run"]),
+          includePrevious: Boolean(parsed.flags["include-previous"]),
+          quiet: true,
+          logger: createSilentLogger(),
+        });
+        logger.plain(toJson(report));
+        return 0;
+      }
+
       await runCapture({
         cwd,
         agent: parsed.positional[0],
@@ -96,6 +132,17 @@ export const run = async (
         return 0;
       }
 
+      if (json) {
+        const report = await runHistoryReport({
+          cwd,
+          store: flagString(parsed.flags.store),
+          quiet: true,
+          logger: createSilentLogger(),
+        });
+        logger.plain(toJson(report));
+        return 0;
+      }
+
       await runHistory({
         cwd,
         store: flagString(parsed.flags.store),
@@ -108,6 +155,15 @@ export const run = async (
         return 0;
       }
 
+      if (json) {
+        const report = await runDoctor({
+          cwd,
+          logger: createSilentLogger(),
+        });
+        logger.plain(toJson(report ?? uninitializedReport("doctor", cwd)));
+        return 0;
+      }
+
       await runDoctor({
         cwd,
         logger,
@@ -116,6 +172,22 @@ export const run = async (
     case "status":
       if (parsed.flags.help || parsed.flags.h) {
         logger.plain(statusHelpText());
+        return 0;
+      }
+
+      if (json) {
+        const report = await runDoctor({
+          cwd,
+          logger: createSilentLogger(),
+          compact: true,
+        });
+        logger.plain(
+          toJson(
+            report
+              ? { ...report, command: "status" }
+              : uninitializedReport("status", cwd),
+          ),
+        );
         return 0;
       }
 
@@ -196,17 +268,29 @@ const expectsValue = (flag: string): boolean =>
 const flagString = (value: string | boolean | undefined): string | undefined =>
   typeof value === "string" ? value : undefined;
 
+const toJson = (value: unknown): string =>
+  `${JSON.stringify(value, null, 2)}\n`;
+
+const uninitializedReport = (command: string, cwd: string) => ({
+  schemaVersion: 1,
+  command,
+  generatedAt: new Date().toISOString(),
+  initialized: false,
+  root: cwd,
+  message: "Run `poko init` to create .poko/poko.json.",
+});
+
 export const helpText =
   (): string => `${pc.bold("poko")} - your pocket context buddy
 
 Usage:
   poko init [--yes] [--force]
-  poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history]
+  poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history] [--json]
   poko export <agent> [--stdout] [--dry-run] [--diff] [--backup]
-  poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--include-previous]
-  poko history [--store local|repo|both]
-  poko status
-  poko doctor
+  poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--include-previous] [--json]
+  poko history [--store local|repo|both] [--json]
+  poko status [--json]
+  poko doctor [--json]
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
 
 Agents:
@@ -245,6 +329,7 @@ Options:
   --diff            With --dry-run, print line-level static file changes
   --backup          Back up overwritten static files under .poko/backups/
   --no-history      Skip project chat/session history sync
+  --json            Print machine-readable sync report
 `;
 
 const exportHelpText = (): string => `${pc.bold("poko export <agent>")}
@@ -271,6 +356,7 @@ Options:
   --dry-run         Show what would be captured without writing history
   --include-previous
                    Include older same-path sessions from before .poko init
+  --json            Print machine-readable capture report
 `;
 
 const historyHelpText = (): string => `${pc.bold("poko history")}
@@ -279,17 +365,24 @@ Lists captured project sessions.
 
 Options:
   --store <store>   local, repo, or both
+  --json            Print machine-readable history index
 `;
 
 const doctorHelpText = (): string => `${pc.bold("poko doctor")}
 
 Checks project context sources, adapter detection, captured history, and native sync dry-run details.
+
+Options:
+  --json            Print machine-readable doctor report
 `;
 
 const statusHelpText = (): string => `${pc.bold("poko status")}
 
 Shows a compact readiness summary for the current project.
 Use \`poko doctor\` when you want the full adapter and native sync report.
+
+Options:
+  --json            Print machine-readable status report
 `;
 
 const handoffHelpText = (): string => `${pc.bold("poko handoff <agent>")}

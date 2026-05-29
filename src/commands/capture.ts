@@ -20,17 +20,47 @@ export type CaptureOptions = {
   store?: string;
   dryRun?: boolean;
   includePrevious?: boolean;
+  quiet?: boolean;
   logger: Logger;
 };
 
 export const runCapture = async (options: CaptureOptions): Promise<number> => {
+  const report = await runCaptureReport(options);
+  return report.capturedSessions;
+};
+
+export type CaptureReport = {
+  schemaVersion: 1;
+  command: "capture";
+  generatedAt: string;
+  root: string;
+  store: HistoryStore;
+  dryRun: boolean;
+  includePrevious: boolean;
+  capturedSessions: number;
+  agents: Array<{
+    id: string;
+    displayName: string;
+    capturedSessions: number;
+    skippedOlderSessions: number;
+    writtenEntries: number;
+  }>;
+};
+
+export const runCaptureReport = async (
+  options: CaptureOptions,
+): Promise<CaptureReport> => {
   const config = await loadPokoConfig(options.cwd);
   const store = parseStore(options.store ?? config.history.defaultStore);
   const importers = selectImporters(options, config.history.agents);
   let captured = 0;
+  const agents: CaptureReport["agents"] = [];
 
   for (const importer of importers) {
-    options.logger.info(`checking ${importer.displayName} history...`);
+    if (!options.quiet) {
+      options.logger.info(`checking ${importer.displayName} history...`);
+    }
+
     const importedSessions = await importer.capture(options.cwd);
     const { sessions, skipped } = filterProjectIncarnation(
       importedSessions,
@@ -39,33 +69,66 @@ export const runCapture = async (options: CaptureOptions): Promise<number> => {
     );
     const stampedSessions = stampProjectIdentity(sessions, config);
     captured += sessions.length;
+    let writtenEntries = 0;
 
     if (options.dryRun) {
-      options.logger.info(
-        `would capture ${sessions.length} ${importer.displayName} session(s).`,
-      );
-      reportSessions(sessions, options.logger);
-      reportSkippedSessions(skipped, options.logger);
+      if (!options.quiet) {
+        options.logger.info(
+          `would capture ${sessions.length} ${importer.displayName} session(s).`,
+        );
+        reportSessions(sessions, options.logger);
+        reportSkippedSessions(skipped, options.logger);
+      }
+      agents.push({
+        id: importer.id,
+        displayName: importer.displayName,
+        capturedSessions: sessions.length,
+        skippedOlderSessions: skipped.length,
+        writtenEntries,
+      });
       continue;
     }
 
-    await writeHistorySessions(
-      options.cwd,
-      store,
-      stampedSessions,
-      config.project.id,
-    );
-    options.logger.success(
-      `captured ${sessions.length} ${importer.displayName} session(s).`,
-    );
-    reportSkippedSessions(skipped, options.logger);
+    writtenEntries = (
+      await writeHistorySessions(
+        options.cwd,
+        store,
+        stampedSessions,
+        config.project.id,
+      )
+    ).length;
+
+    if (!options.quiet) {
+      options.logger.success(
+        `captured ${sessions.length} ${importer.displayName} session(s).`,
+      );
+      reportSkippedSessions(skipped, options.logger);
+    }
+
+    agents.push({
+      id: importer.id,
+      displayName: importer.displayName,
+      capturedSessions: sessions.length,
+      skippedOlderSessions: skipped.length,
+      writtenEntries,
+    });
   }
 
-  if (captured === 0) {
+  if (captured === 0 && !options.quiet) {
     options.logger.warn("no matching history found for this project.");
   }
 
-  return captured;
+  return {
+    schemaVersion: 1,
+    command: "capture",
+    generatedAt: new Date().toISOString(),
+    root: options.cwd,
+    store,
+    dryRun: Boolean(options.dryRun),
+    includePrevious: Boolean(options.includePrevious),
+    capturedSessions: captured,
+    agents,
+  };
 };
 
 const stampProjectIdentity = (

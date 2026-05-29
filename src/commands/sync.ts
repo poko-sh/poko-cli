@@ -23,21 +23,82 @@ export type SyncOptions = {
   noHistory?: boolean;
   backup?: boolean;
   diff?: boolean;
+  quiet?: boolean;
   logger: Logger;
 };
 
+export type SyncReport = {
+  schemaVersion: 1;
+  command: "sync";
+  generatedAt: string;
+  root: string;
+  dryRun: boolean;
+  noHistory: boolean;
+  agents: string[];
+  files: WriteResult[];
+  changedFiles: number;
+  history?: {
+    enabled: boolean;
+    sessions: Array<{
+      id: string;
+      title: string;
+      sourceAgent: string;
+      messages: number;
+      updatedAt?: string;
+      sourcePath?: string;
+    }>;
+    skippedOlderSessions: number;
+    nativeTargets: Array<{
+      target: string;
+      location: string;
+      sessions: number;
+      messages: number;
+      dryRun: boolean;
+      skipped: boolean;
+      reason?: string;
+      details?: Record<string, number | string | boolean>;
+    }>;
+  };
+  warnings: string[];
+};
+
 export const runSync = async (options: SyncOptions): Promise<WriteResult[]> => {
+  const report = await runSyncReport(options);
+  return report.files;
+};
+
+export const runSyncReport = async (
+  options: SyncOptions,
+): Promise<SyncReport> => {
   const context = await loadPokoContext(options.cwd);
 
-  for (const warning of context.warnings) {
-    options.logger.warn(warning);
+  if (!options.quiet) {
+    for (const warning of context.warnings) {
+      options.logger.warn(warning);
+    }
   }
 
   const adapters = await selectAdapters(options, context.config);
 
   if (adapters.length === 0) {
-    options.logger.warn("no supported agents detected. Try `poko sync --all`.");
-    return [];
+    if (!options.quiet) {
+      options.logger.warn(
+        "no supported agents detected. Try `poko sync --all`.",
+      );
+    }
+
+    return {
+      schemaVersion: 1,
+      command: "sync",
+      generatedAt: new Date().toISOString(),
+      root: context.root,
+      dryRun: Boolean(options.dryRun),
+      noHistory: Boolean(options.noHistory),
+      agents: [],
+      files: [],
+      changedFiles: 0,
+      warnings: context.warnings,
+    };
   }
 
   const adapterOperations = adapters.flatMap((adapter) =>
@@ -50,7 +111,7 @@ export const runSync = async (options: SyncOptions): Promise<WriteResult[]> => {
           config: context.config,
           targetAgents: adapters.map((adapter) => adapter.id),
           dryRun: options.dryRun,
-          logger: options.logger,
+          logger: options.quiet ? undefined : options.logger,
         })
       : undefined;
   const operations = dedupeOperations([...adapterOperations]);
@@ -60,8 +121,10 @@ export const runSync = async (options: SyncOptions): Promise<WriteResult[]> => {
     showDiff: options.diff,
   });
 
-  reportWriteResults(results, options.logger, options.dryRun ?? false);
-  reportHistorySync(historySync, options.logger, options.dryRun ?? false);
+  if (!options.quiet) {
+    reportWriteResults(results, options.logger, options.dryRun ?? false);
+    reportHistorySync(historySync, options.logger, options.dryRun ?? false);
+  }
 
   if (adapters.some((adapter) => adapter.id === "codex")) {
     const codexMcp = operations.some(
@@ -69,14 +132,52 @@ export const runSync = async (options: SyncOptions): Promise<WriteResult[]> => {
     );
 
     if (codexMcp) {
-      options.logger.warn(
-        "Codex may ignore project .codex/config.toml until this repo is trusted in Codex.",
-      );
+      if (!options.quiet) {
+        options.logger.warn(
+          "Codex may ignore project .codex/config.toml until this repo is trusted in Codex.",
+        );
+      }
     }
   }
 
-  return results;
+  return {
+    schemaVersion: 1,
+    command: "sync",
+    generatedAt: new Date().toISOString(),
+    root: context.root,
+    dryRun: Boolean(options.dryRun),
+    noHistory: Boolean(options.noHistory),
+    agents: adapters.map((adapter) => adapter.id),
+    files: results,
+    changedFiles: results.filter((result) => result.action !== "unchanged")
+      .length,
+    history: historySync
+      ? summarizeHistorySync(historySync)
+      : {
+          enabled: false,
+          sessions: [],
+          skippedOlderSessions: 0,
+          nativeTargets: [],
+        },
+    warnings: context.warnings,
+  };
 };
+
+const summarizeHistorySync = (
+  result: ProjectHistorySyncResult,
+): NonNullable<SyncReport["history"]> => ({
+  enabled: true,
+  sessions: result.sessions.map((session) => ({
+    id: session.id,
+    title: session.title,
+    sourceAgent: session.sourceAgent,
+    messages: session.messages.length,
+    updatedAt: session.updatedAt,
+    sourcePath: session.sourcePath,
+  })),
+  skippedOlderSessions: result.skipped.length,
+  nativeTargets: result.nativeTargets.map((target) => ({ ...target })),
+});
 
 const reportHistorySync = (
   result: ProjectHistorySyncResult | undefined,

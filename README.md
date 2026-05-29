@@ -22,12 +22,12 @@ bun src/cli.ts sync --all
 
 ```sh
 poko init [--yes] [--force]
-poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history]
+poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history] [--json]
 poko export <agent> [--stdout] [--dry-run] [--diff] [--backup]
-poko capture [agent|--all] [--store local|repo|both] [--dry-run]
-poko history [--store local|repo|both]
-poko status
-poko doctor
+poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--json]
+poko history [--store local|repo|both] [--json]
+poko status [--json]
+poko doctor [--json]
 poko handoff <agent> [--stdout] [--raw] [--limit 5]
 ```
 
@@ -118,7 +118,12 @@ poko handoff claude --raw --limit 3
 
 ```sh
 poko status
+poko status --json
 ```
+
+The paid desktop app uses the JSON protocol instead of parsing terminal output:
+`poko status --json`, `poko doctor --json`, `poko sync --json`, `poko capture
+--json`, and `poko history --json`. See `docs/protocol.md`.
 
 `poko doctor` is the quickest way to inspect whether a project is ready to sync. It reports:
 
@@ -175,6 +180,15 @@ Standalone binaries can be added later with:
 
 ```sh
 bun run compile
+```
+
+Tauri sidecar binaries for the paid app can be built with:
+
+```sh
+bun run compile:darwin-arm64
+bun run compile:darwin-x64
+bun run compile:linux-x64
+bun run compile:windows-x64
 ```
 
 ## Open Core

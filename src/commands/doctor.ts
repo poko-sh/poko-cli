@@ -18,14 +18,67 @@ export type DoctorOptions = {
   compact?: boolean;
 };
 
-export const runDoctor = async (options: DoctorOptions): Promise<void> => {
+export type SourceState = "missing" | "empty" | "present";
+
+export type DoctorReport = {
+  schemaVersion: 1;
+  command: "doctor";
+  generatedAt: string;
+  project: {
+    root: string;
+    id: string;
+    createdAt: string;
+    historyStore: string;
+    historyOnSync: boolean;
+  };
+  sourceContext: {
+    text: Record<keyof PokoContext["sections"], SourceState>;
+    mcp: { state: SourceState; servers: number };
+    skills: number;
+  };
+  adapters: Array<{
+    id: string;
+    displayName: string;
+    enabled: boolean;
+    detected: boolean;
+    reasons: string[];
+  }>;
+  history: {
+    currentSessions: number;
+    skippedOlderSessions: number;
+    importers: Array<{
+      id: string;
+      enabled: boolean;
+      currentSessions: number;
+    }>;
+  };
+  nativeSync: {
+    readyTargets: number;
+    skippedTargets: number;
+    targets: Array<{
+      target: string;
+      location: string;
+      sessions: number;
+      messages: number;
+      dryRun: boolean;
+      skipped: boolean;
+      reason?: string;
+      details?: Record<string, number | string | boolean>;
+    }>;
+  };
+  warnings: string[];
+};
+
+export const runDoctor = async (
+  options: DoctorOptions,
+): Promise<DoctorReport | undefined> => {
   const root = path.resolve(options.cwd);
 
   options.logger.plain(options.compact ? "poko status" : "poko doctor");
 
   if (!(await pathExists(path.join(root, POKO_DIR, "poko.json")))) {
     options.logger.warn("this project is not initialized. Run `poko init`.");
-    return;
+    return undefined;
   }
 
   const context = await loadPokoContext(root);
@@ -52,16 +105,16 @@ export const runDoctor = async (options: DoctorOptions): Promise<void> => {
     sessions: historySnapshot.sessions,
     dryRun: true,
   });
+  const report = await buildDoctorReport(
+    context,
+    detections,
+    historySnapshot,
+    nativeTargets,
+  );
 
   if (options.compact) {
-    reportStatusSummary(
-      context,
-      detections,
-      historySnapshot,
-      nativeTargets,
-      options.logger,
-    );
-    return;
+    reportStatusSummary(report, options.logger);
+    return report;
   }
 
   reportProject(context, options.logger);
@@ -70,9 +123,11 @@ export const runDoctor = async (options: DoctorOptions): Promise<void> => {
   reportHistory(context, historySnapshot, options.logger);
   reportNativeTargets(nativeTargets, options.logger);
   reportWarnings(context, options.logger);
+
+  return report;
 };
 
-const reportStatusSummary = (
+const buildDoctorReport = async (
   context: PokoContext,
   detections: Array<{
     adapter: (typeof ADAPTERS)[number];
@@ -81,36 +136,99 @@ const reportStatusSummary = (
   }>,
   historySnapshot: Awaited<ReturnType<typeof buildProjectHistorySync>>,
   nativeTargets: Awaited<ReturnType<typeof syncNativeHistoryTargets>>,
-  logger: Logger,
-): void => {
-  const presentSections = Object.entries(context.sections).filter(([, value]) =>
-    value.trim(),
-  ).length;
-  const mcpCount = Object.keys(context.mcpServers).length;
-  const enabledAdapters = detections.filter(({ enabled }) => enabled).length;
-  const detectedAdapters = detections.filter(
-    ({ enabled, detection }) => enabled && detection.detected,
-  ).length;
-  const nativeReady = nativeTargets.filter((target) => !target.skipped).length;
-  const nativeSkipped = nativeTargets.length - nativeReady;
+): Promise<DoctorReport> => {
+  const textStates = {} as Record<keyof PokoContext["sections"], SourceState>;
 
-  logger.plain(`  project: ${context.config.project.id || "(unset)"}`);
-  logger.plain(`  root: ${context.root}`);
+  for (const [fileName, content] of Object.entries(context.sections) as Array<
+    [keyof PokoContext["sections"], string]
+  >) {
+    textStates[fileName] = await sourceState(
+      context,
+      `${fileName}.md`,
+      content,
+    );
+  }
+
+  const readyTargets = nativeTargets.filter((target) => !target.skipped).length;
+
+  return {
+    schemaVersion: 1,
+    command: "doctor",
+    generatedAt: new Date().toISOString(),
+    project: {
+      root: context.root,
+      id: context.config.project.id,
+      createdAt: context.config.project.createdAt,
+      historyStore: context.config.history.defaultStore,
+      historyOnSync: context.config.history.syncOnProjectSync,
+    },
+    sourceContext: {
+      text: textStates,
+      mcp: {
+        state: await sourceState(
+          context,
+          "mcp.json",
+          Object.keys(context.mcpServers).length > 0 ? "servers" : "",
+        ),
+        servers: Object.keys(context.mcpServers).length,
+      },
+      skills: context.skills.length,
+    },
+    adapters: detections.map(({ adapter, detection, enabled }) => ({
+      id: adapter.id,
+      displayName: adapter.displayName,
+      enabled,
+      detected: detection.detected,
+      reasons: detection.reasons,
+    })),
+    history: {
+      currentSessions: historySnapshot.sessions.length,
+      skippedOlderSessions: historySnapshot.skipped.length,
+      importers: HISTORY_IMPORTERS.map((importer) => ({
+        id: importer.id,
+        enabled: context.config.history.agents[importer.id],
+        currentSessions: historySnapshot.sessions.filter(
+          (session) => session.sourceAgent === importer.id,
+        ).length,
+      })),
+    },
+    nativeSync: {
+      readyTargets,
+      skippedTargets: nativeTargets.length - readyTargets,
+      targets: nativeTargets.map((target) => ({ ...target })),
+    },
+    warnings: context.warnings,
+  };
+};
+
+const reportStatusSummary = (report: DoctorReport, logger: Logger): void => {
+  const presentSections = Object.values(report.sourceContext.text).filter(
+    (state) => state === "present",
+  ).length;
+  const enabledAdapters = report.adapters.filter(
+    (adapter) => adapter.enabled,
+  ).length;
+  const detectedAdapters = report.adapters.filter(
+    (adapter) => adapter.enabled && adapter.detected,
+  ).length;
+
+  logger.plain(`  project: ${report.project.id || "(unset)"}`);
+  logger.plain(`  root: ${report.project.root}`);
   logger.plain(
-    `  source context: ${presentSections} text file(s), ${mcpCount} MCP server(s), ${context.skills.length} skill(s)`,
+    `  source context: ${presentSections} text file(s), ${report.sourceContext.mcp.servers} MCP server(s), ${report.sourceContext.skills} skill(s)`,
   );
   logger.plain(
     `  adapters: ${enabledAdapters} enabled, ${detectedAdapters} detected here`,
   );
   logger.plain(
-    `  history: ${historySnapshot.sessions.length} current session(s), ${historySnapshot.skipped.length} older same-path skipped`,
+    `  history: ${report.history.currentSessions} current session(s), ${report.history.skippedOlderSessions} older same-path skipped`,
   );
   logger.plain(
-    `  native sync: ${nativeReady} ready, ${nativeSkipped} skipped in dry-run`,
+    `  native sync: ${report.nativeSync.readyTargets} ready, ${report.nativeSync.skippedTargets} skipped in dry-run`,
   );
 
-  if (context.warnings.length > 0) {
-    logger.plain(`  warnings: ${context.warnings.length}`);
+  if (report.warnings.length > 0) {
+    logger.plain(`  warnings: ${report.warnings.length}`);
   }
 };
 
@@ -151,7 +269,7 @@ const sourceState = async (
   context: PokoContext,
   fileName: string,
   content: string,
-): Promise<string> => {
+): Promise<SourceState> => {
   const present = await pathExists(path.join(context.pokoDir, fileName));
 
   if (!present) {
