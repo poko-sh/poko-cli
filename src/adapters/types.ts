@@ -8,6 +8,8 @@ export const AGENT_IDS = [
   "t3code",
   "opencode",
   "pi",
+  "hermes",
+  "openclaw",
   "codex",
 ] as const;
 
@@ -19,7 +21,11 @@ const AGENT_ALIASES: Record<string, AgentId> = {
   google: "antigravity",
   "github-copilot": "copilot",
   oc: "opencode",
+  claw: "openclaw",
+  clawdbot: "openclaw",
+  "hermes-agent": "hermes",
   "open-code": "opencode",
+  "open-claw": "openclaw",
   "pi-coding-agent": "pi",
   t3: "t3code",
   "t3-code": "t3code",

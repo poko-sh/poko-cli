@@ -50,15 +50,31 @@ const HistorySchema = z
         claude: z.boolean().default(true),
         cursor: z.boolean().default(true),
         pi: z.boolean().default(true),
+        hermes: z.boolean().default(true),
+        openclaw: z.boolean().default(true),
       })
-      .default({ codex: true, claude: true, cursor: true, pi: true }),
+      .default({
+        codex: true,
+        claude: true,
+        cursor: true,
+        pi: true,
+        hermes: true,
+        openclaw: true,
+      }),
   })
   .default({
     defaultStore: "local",
     captureRaw: true,
     includePreviousProjectIncarnations: false,
     syncOnProjectSync: true,
-    agents: { codex: true, claude: true, cursor: true, pi: true },
+    agents: {
+      codex: true,
+      claude: true,
+      cursor: true,
+      pi: true,
+      hermes: true,
+      openclaw: true,
+    },
   });
 
 const ProjectSchema = z
@@ -81,6 +97,8 @@ export const PokoConfigSchema = z
         t3code: SkillsAdapterSchema,
         opencode: McpAdapterSchema,
         pi: SkillsAdapterSchema,
+        hermes: SkillsAdapterSchema,
+        openclaw: SkillsAdapterSchema,
         codex: McpAdapterSchema,
       })
       .default({
@@ -91,6 +109,8 @@ export const PokoConfigSchema = z
         t3code: { enabled: true, skills: true },
         opencode: { enabled: true, mcp: true },
         pi: { enabled: true, skills: true },
+        hermes: { enabled: true, skills: true },
+        openclaw: { enabled: true, skills: true },
         codex: { enabled: true, mcp: true },
       }),
     pro: z
@@ -114,6 +134,8 @@ export const PokoConfigSchema = z
       t3code: { enabled: true, skills: true },
       opencode: { enabled: true, mcp: true },
       pi: { enabled: true, skills: true },
+      hermes: { enabled: true, skills: true },
+      openclaw: { enabled: true, skills: true },
       codex: { enabled: true, mcp: true },
     },
     pro: { enabledFeatures: [] },
@@ -122,7 +144,14 @@ export const PokoConfigSchema = z
       captureRaw: true,
       includePreviousProjectIncarnations: false,
       syncOnProjectSync: true,
-      agents: { codex: true, claude: true, cursor: true, pi: true },
+      agents: {
+        codex: true,
+        claude: true,
+        cursor: true,
+        pi: true,
+        hermes: true,
+        openclaw: true,
+      },
     },
   });
 

@@ -193,10 +193,10 @@ Usage:
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
 
 Agents:
-  claude, cursor, antigravity, copilot, t3code, opencode, pi, codex
+  claude, cursor, antigravity, copilot, t3code, opencode, pi, hermes, openclaw, codex
 
 Aliases:
-  agy -> antigravity, vscode -> copilot, t3 -> t3code, oc -> opencode, pi-coding-agent -> pi
+  agy -> antigravity, vscode -> copilot, t3 -> t3code, oc -> opencode, pi-coding-agent -> pi, hermes-agent -> hermes, claw -> openclaw
 
 Examples:
   poko init
@@ -241,7 +241,7 @@ const captureHelpText = (): string => `${pc.bold("poko capture [agent]")}
 Captures raw local chat/session history for this project.
 
 Agents:
-  codex, claude, cursor, pi
+  codex, claude, cursor, pi, hermes, openclaw
 
 Options:
   --all             Capture every enabled history importer

@@ -19,12 +19,16 @@ let claudeHome: string;
 let cursorStorage: string;
 let cursorGlobalStateDbPath: string;
 let piHome: string;
+let hermesHome: string;
+let openClawStateDir: string;
 let oldCodexHome: string | undefined;
 let oldClaudeHome: string | undefined;
 let oldClaudeConfigDir: string | undefined;
 let oldCursorStorage: string | undefined;
 let oldCursorGlobalStateDb: string | undefined;
 let oldPiAgentDir: string | undefined;
+let oldHermesHome: string | undefined;
+let oldOpenClawStateDir: string | undefined;
 
 beforeEach(async () => {
   cwd = await makeTempDir();
@@ -33,18 +37,24 @@ beforeEach(async () => {
   cursorStorage = await makeTempDir();
   cursorGlobalStateDbPath = path.join(await makeTempDir(), "state.vscdb");
   piHome = await makeTempDir();
+  hermesHome = await makeTempDir();
+  openClawStateDir = await makeTempDir();
   oldCodexHome = process.env.CODEX_HOME;
   oldClaudeHome = process.env.CLAUDE_HOME;
   oldClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
   oldCursorStorage = process.env.POKO_CURSOR_STORAGE_ROOT;
   oldCursorGlobalStateDb = process.env.POKO_CURSOR_GLOBAL_STATE_DB;
   oldPiAgentDir = process.env.PI_CODING_AGENT_DIR;
+  oldHermesHome = process.env.HERMES_HOME;
+  oldOpenClawStateDir = process.env.OPENCLAW_STATE_DIR;
   process.env.CODEX_HOME = codexHome;
   process.env.CLAUDE_HOME = claudeHome;
   process.env.CLAUDE_CONFIG_DIR = claudeHome;
   process.env.POKO_CURSOR_STORAGE_ROOT = cursorStorage;
   process.env.POKO_CURSOR_GLOBAL_STATE_DB = cursorGlobalStateDbPath;
   process.env.PI_CODING_AGENT_DIR = piHome;
+  process.env.HERMES_HOME = hermesHome;
+  process.env.OPENCLAW_STATE_DIR = openClawStateDir;
   createCursorGlobalStateDb(cursorGlobalStateDbPath);
   await runInit({ cwd, logger: createMemoryLogger() });
   await setProjectCreatedAt("2026-01-01T00:00:00.000Z");
@@ -57,11 +67,15 @@ afterEach(async () => {
   restoreEnv("POKO_CURSOR_STORAGE_ROOT", oldCursorStorage);
   restoreEnv("POKO_CURSOR_GLOBAL_STATE_DB", oldCursorGlobalStateDb);
   restoreEnv("PI_CODING_AGENT_DIR", oldPiAgentDir);
+  restoreEnv("HERMES_HOME", oldHermesHome);
+  restoreEnv("OPENCLAW_STATE_DIR", oldOpenClawStateDir);
   await removeTempDir(cwd);
   await removeTempDir(codexHome);
   await removeTempDir(claudeHome);
   await removeTempDir(cursorStorage);
   await removeTempDir(piHome);
+  await removeTempDir(hermesHome);
+  await removeTempDir(openClawStateDir);
   await removeTempDir(path.dirname(cursorGlobalStateDbPath));
 });
 
@@ -256,6 +270,58 @@ describe("history capture", () => {
     expect(sessions[0]?.messages.map((message) => message.text)).toEqual([
       "ask pi",
       "answer pi",
+    ]);
+  });
+
+  test("captures Hermes SQLite sessions", async () => {
+    await seedHermesSession();
+    await seedHermesSession({
+      id: "poko-imported-hermes",
+      title: "Poko imported Hermes",
+      userMessage: "should not echo",
+      assistantMessage: "skip me",
+      pokoImported: true,
+    });
+
+    await runCapture({
+      cwd,
+      agent: "hermes",
+      store: "repo",
+      logger: createMemoryLogger(),
+    });
+
+    const sessions = await loadHistorySessions(cwd, "repo", 1);
+    expect(sessions[0]?.sourceAgent).toBe("hermes");
+    expect(sessions[0]?.title).toBe("Hermes seed");
+    expect(sessions[0]?.messages.map((message) => message.text)).toEqual([
+      "ask hermes",
+      "answer hermes",
+    ]);
+  });
+
+  test("captures OpenClaw JSONL sessions", async () => {
+    await seedOpenClawSession();
+    await seedOpenClawSession({
+      id: "poko-imported-openclaw",
+      title: "Poko imported OpenClaw",
+      userMessage: "should not echo",
+      assistantMessage: "skip me",
+      pokoImported: true,
+    });
+
+    await runCapture({
+      cwd,
+      agent: "openclaw",
+      store: "repo",
+      logger: createMemoryLogger(),
+    });
+
+    const sessions = await loadHistorySessions(cwd, "repo", 1);
+    expect(sessions[0]?.sourceAgent).toBe("openclaw");
+    expect(sessions[0]?.title).toBe("OpenClaw seed");
+    expect(sessions[0]?.messages.map((message) => message.text)).toEqual([
+      "ask openclaw",
+      "answer openclaw",
     ]);
   });
 
@@ -666,6 +732,171 @@ const seedPiSession = async (
           usage: {},
           stopReason: "stop",
           timestamp: Date.parse("2026-05-29T00:00:02.000Z"),
+        },
+      }),
+    ].join("\n"),
+    "utf8",
+  );
+};
+
+const seedHermesSession = async (
+  options: {
+    id?: string;
+    title?: string;
+    userMessage?: string;
+    assistantMessage?: string;
+    pokoImported?: boolean;
+  } = {},
+): Promise<void> => {
+  const id = options.id ?? "hermes-session";
+  const database = new Database(path.join(hermesHome, "state.db"));
+
+  try {
+    createHermesStateSchema(database);
+    database
+      .query(
+        `insert into sessions (
+          id, source, model_config, system_prompt, started_at, ended_at,
+          title, message_count
+        ) values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        options.pokoImported ? "poko" : "cli",
+        options.pokoImported
+          ? JSON.stringify({
+              pokoImport: { originator: "poko", projectRoot: cwd },
+            })
+          : null,
+        `Current working directory: ${cwd}`,
+        Date.parse("2026-05-29T00:00:00.000Z") / 1000,
+        Date.parse("2026-05-29T00:00:02.000Z") / 1000,
+        options.title ?? "Hermes seed",
+        2,
+      );
+    database
+      .query(
+        "insert into messages (session_id, role, content, timestamp) values (?, ?, ?, ?)",
+      )
+      .run(
+        id,
+        "user",
+        options.userMessage ?? "ask hermes",
+        Date.parse("2026-05-29T00:00:01.000Z") / 1000,
+      );
+    database
+      .query(
+        "insert into messages (session_id, role, content, timestamp) values (?, ?, ?, ?)",
+      )
+      .run(
+        id,
+        "assistant",
+        options.assistantMessage ?? "answer hermes",
+        Date.parse("2026-05-29T00:00:02.000Z") / 1000,
+      );
+  } finally {
+    database.close();
+  }
+};
+
+const createHermesStateSchema = (database: Database): void => {
+  database.run(`
+    create table if not exists sessions (
+      id text primary key,
+      source text not null,
+      model text,
+      model_config text,
+      system_prompt text,
+      started_at real not null,
+      ended_at real,
+      title text,
+      message_count integer default 0
+    )
+  `);
+  database.run(`
+    create table if not exists messages (
+      id integer primary key autoincrement,
+      session_id text not null,
+      role text not null,
+      content text,
+      timestamp real not null
+    )
+  `);
+};
+
+const seedOpenClawSession = async (
+  options: {
+    id?: string;
+    title?: string;
+    userMessage?: string;
+    assistantMessage?: string;
+    pokoImported?: boolean;
+  } = {},
+): Promise<void> => {
+  const id = options.id ?? "openclaw-session";
+  const sessionPath = path.join(
+    openClawStateDir,
+    "agents",
+    "main",
+    "sessions",
+    `2026-05-29T00-00-00-000Z_${id}.jsonl`,
+  );
+  await mkdir(path.dirname(sessionPath), { recursive: true });
+  await writeFile(
+    sessionPath,
+    [
+      JSON.stringify({
+        type: "session",
+        version: 3,
+        id,
+        timestamp: "2026-05-29T00:00:00.000Z",
+        cwd,
+      }),
+      ...(options.pokoImported
+        ? [
+            JSON.stringify({
+              type: "custom",
+              id: "10000000",
+              parentId: null,
+              timestamp: "2026-05-29T00:00:00.000Z",
+              customType: "poko.import",
+              data: {
+                originator: "poko",
+                projectRoot: cwd,
+              },
+            }),
+          ]
+        : []),
+      JSON.stringify({
+        type: "session_info",
+        id: "20000000",
+        parentId: options.pokoImported ? "10000000" : null,
+        timestamp: "2026-05-29T00:00:00.000Z",
+        name: options.title ?? "OpenClaw seed",
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "30000000",
+        parentId: "20000000",
+        timestamp: "2026-05-29T00:00:01.000Z",
+        message: {
+          role: "user",
+          content: options.userMessage ?? "ask openclaw",
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "40000000",
+        parentId: "30000000",
+        timestamp: "2026-05-29T00:00:02.000Z",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: options.assistantMessage ?? "answer openclaw",
+            },
+          ],
         },
       }),
     ].join("\n"),

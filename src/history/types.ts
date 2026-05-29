@@ -1,4 +1,11 @@
-export const HISTORY_AGENTS = ["codex", "claude", "cursor", "pi"] as const;
+export const HISTORY_AGENTS = [
+  "codex",
+  "claude",
+  "cursor",
+  "pi",
+  "hermes",
+  "openclaw",
+] as const;
 
 export type HistoryAgent = (typeof HISTORY_AGENTS)[number];
 

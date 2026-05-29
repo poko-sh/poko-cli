@@ -2,7 +2,7 @@
 
 Your pocket context buddy for AI coding agents.
 
-Poko keeps one canonical `.poko/` folder in your project and syncs it into the files different coding agents expect: `CLAUDE.md`, Cursor rules, `AGENTS.md`, `GEMINI.md`, Pi skills, and local MCP configs.
+Poko keeps one canonical `.poko/` folder in your project and syncs it into the files different coding agents expect: `CLAUDE.md`, Cursor rules, `AGENTS.md`, `GEMINI.md`, agent skills, and local MCP configs.
 
 It can also capture local chat/session history from coding agents into a portable Poko history store, then render handoffs for whichever agent you are switching to next.
 
@@ -36,6 +36,8 @@ Supported agents:
 - `t3code`
 - `opencode`
 - `pi`
+- `hermes`
+- `openclaw`
 - `codex`
 
 Useful aliases:
@@ -45,6 +47,8 @@ Useful aliases:
 - `t3`, `t3-code` -> `t3code`
 - `oc`, `open-code` -> `opencode`
 - `pi-coding-agent` -> `pi`
+- `hermes-agent` -> `hermes`
+- `claw`, `clawdbot`, `open-claw` -> `openclaw`
 
 ## Canonical Project Context
 
@@ -70,7 +74,7 @@ their team.
 
 By default, `--all` syncs every adapter enabled in `.poko/poko.json`. Aider and legacy Gemini CLI support have been removed from the MVP target list; Antigravity owns the `GEMINI.md` path now.
 
-Project sync also captures project-scoped chat/session history from enabled local importers and syncs it into native agent history when that target supports it. Native chat sync currently supports Claude Code, Cursor, T3 Code, OpenCode, Pi, and Codex. Cursor and T3 Code write to local SQLite state, so on macOS Poko warns that it needs to close the app, asks it to quit, waits until it is closed, performs the sync, then reopens it. Use `poko sync --no-history` when you only want static context files.
+Project sync also captures project-scoped chat/session history from enabled local importers and syncs it into native agent history when that target supports it. Native chat sync currently supports Claude Code, Cursor, T3 Code, OpenCode, Pi, Hermes, OpenClaw, and Codex. Cursor and T3 Code write to local SQLite state, so on macOS Poko warns that it needs to close the app, asks it to quit, waits until it is closed, performs the sync, then reopens it. Use `poko sync --no-history` when you only want static context files.
 
 `poko sync --dry-run` prints the specific project sessions it would include, each native target location, and target-specific details such as stale imports removed, files written, import commands run, and same-agent sessions skipped.
 
@@ -82,6 +86,8 @@ Poko can capture raw project history from:
 - Claude Code: `~/.claude/projects/<project>/*.jsonl`
 - Cursor: workspace `state.vscdb` plus global composer/bubble history
 - Pi: `~/.pi/agent/sessions/<project>/*.jsonl`
+- Hermes Agent: `~/.hermes/state.db`
+- OpenClaw: `~/.openclaw/agents/<agent>/sessions/*.jsonl`
 
 History storage is configurable:
 
@@ -124,6 +130,8 @@ poko doctor
 - T3 Code: `AGENTS.md`, `.agents/skills/*/SKILL.md`
 - OpenCode: `AGENTS.md`, `opencode.json`
 - Pi: `AGENTS.md`, `.pi/skills/*/SKILL.md`
+- Hermes Agent: `AGENTS.md`, `.agents/skills/*/SKILL.md`
+- OpenClaw: `AGENTS.md`, `.agents/skills/*/SKILL.md`
 - Codex: `AGENTS.md`, `.codex/config.toml`
 
 ## Development

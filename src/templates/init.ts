@@ -34,6 +34,14 @@ export const DEFAULT_POKO_CONFIG = `{
       "enabled": true,
       "skills": true
     },
+    "hermes": {
+      "enabled": true,
+      "skills": true
+    },
+    "openclaw": {
+      "enabled": true,
+      "skills": true
+    },
     "codex": {
       "enabled": true,
       "mcp": true
@@ -48,7 +56,9 @@ export const DEFAULT_POKO_CONFIG = `{
       "codex": true,
       "claude": true,
       "cursor": true,
-      "pi": true
+      "pi": true,
+      "hermes": true,
+      "openclaw": true
     }
   },
   "pro": {

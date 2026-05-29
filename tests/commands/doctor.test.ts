@@ -8,17 +8,27 @@ import { createMemoryLogger, makeTempDir, removeTempDir } from "../helpers.ts";
 let cwd: string;
 let codexHome: string;
 let piHome: string;
+let hermesHome: string;
+let openClawStateDir: string;
 let oldCodexHome: string | undefined;
 let oldPiAgentDir: string | undefined;
+let oldHermesHome: string | undefined;
+let oldOpenClawStateDir: string | undefined;
 
 beforeEach(async () => {
   cwd = await makeTempDir();
   codexHome = await makeTempDir();
   piHome = await makeTempDir();
+  hermesHome = await makeTempDir();
+  openClawStateDir = await makeTempDir();
   oldCodexHome = process.env.CODEX_HOME;
   oldPiAgentDir = process.env.PI_CODING_AGENT_DIR;
+  oldHermesHome = process.env.HERMES_HOME;
+  oldOpenClawStateDir = process.env.OPENCLAW_STATE_DIR;
   process.env.CODEX_HOME = codexHome;
   process.env.PI_CODING_AGENT_DIR = piHome;
+  process.env.HERMES_HOME = hermesHome;
+  process.env.OPENCLAW_STATE_DIR = openClawStateDir;
   await runInit({ cwd, logger: createMemoryLogger() });
   await writeFile(
     path.join(cwd, ".poko/rules.md"),
@@ -30,9 +40,13 @@ beforeEach(async () => {
 afterEach(async () => {
   restoreEnv("CODEX_HOME", oldCodexHome);
   restoreEnv("PI_CODING_AGENT_DIR", oldPiAgentDir);
+  restoreEnv("HERMES_HOME", oldHermesHome);
+  restoreEnv("OPENCLAW_STATE_DIR", oldOpenClawStateDir);
   await removeTempDir(cwd);
   await removeTempDir(codexHome);
   await removeTempDir(piHome);
+  await removeTempDir(hermesHome);
+  await removeTempDir(openClawStateDir);
 });
 
 const restoreEnv = (key: string, value: string | undefined): void => {

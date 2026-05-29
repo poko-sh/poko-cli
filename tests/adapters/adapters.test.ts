@@ -6,6 +6,8 @@ import { claudeAdapter } from "../../src/adapters/claude.ts";
 import { codexAdapter } from "../../src/adapters/codex.ts";
 import { copilotAdapter } from "../../src/adapters/copilot.ts";
 import { cursorAdapter } from "../../src/adapters/cursor.ts";
+import { hermesAdapter } from "../../src/adapters/hermes.ts";
+import { openClawAdapter } from "../../src/adapters/openclaw.ts";
 import { openCodeAdapter } from "../../src/adapters/opencode.ts";
 import { piAdapter } from "../../src/adapters/pi.ts";
 import { t3CodeAdapter } from "../../src/adapters/t3code.ts";
@@ -147,6 +149,34 @@ describe("agent adapters", () => {
     );
     expect(operations.map((operation) => operation.path)).toContain(
       ".pi/skills/reviewer/SKILL.md",
+    );
+  });
+
+  test("renders Hermes AGENTS.md and portable skills", async () => {
+    const context = await loadPokoContext(cwd);
+    const operations = hermesAdapter.render(context, {
+      config: context.config,
+    });
+
+    expect(operations.map((operation) => operation.path)).toContain(
+      "AGENTS.md",
+    );
+    expect(operations.map((operation) => operation.path)).toContain(
+      ".agents/skills/reviewer/SKILL.md",
+    );
+  });
+
+  test("renders OpenClaw AGENTS.md and skills", async () => {
+    const context = await loadPokoContext(cwd);
+    const operations = openClawAdapter.render(context, {
+      config: context.config,
+    });
+
+    expect(operations.map((operation) => operation.path)).toContain(
+      "AGENTS.md",
+    );
+    expect(operations.map((operation) => operation.path)).toContain(
+      ".agents/skills/reviewer/SKILL.md",
     );
   });
 

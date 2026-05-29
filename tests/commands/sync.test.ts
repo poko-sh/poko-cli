@@ -29,6 +29,8 @@ let cursorStorage: string;
 let cursorGlobalStateDbPath: string;
 let t3DbPath: string;
 let piHome: string;
+let hermesHome: string;
+let openClawStateDir: string;
 let oldCodexHome: string | undefined;
 let oldClaudeHome: string | undefined;
 let oldClaudeConfigDir: string | undefined;
@@ -41,6 +43,8 @@ let oldOpenCodeBin: string | undefined;
 let oldOpenCodeImportModel: string | undefined;
 let oldPiAgentDir: string | undefined;
 let oldPiImportModel: string | undefined;
+let oldHermesHome: string | undefined;
+let oldOpenClawStateDir: string | undefined;
 
 beforeEach(async () => {
   cwd = await makeTempDir();
@@ -50,6 +54,8 @@ beforeEach(async () => {
   cursorGlobalStateDbPath = path.join(await makeTempDir(), "state.vscdb");
   t3DbPath = path.join(await makeTempDir(), "state.sqlite");
   piHome = await makeTempDir();
+  hermesHome = await makeTempDir();
+  openClawStateDir = await makeTempDir();
   oldCodexHome = process.env.CODEX_HOME;
   oldClaudeHome = process.env.CLAUDE_HOME;
   oldClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
@@ -62,6 +68,8 @@ beforeEach(async () => {
   oldOpenCodeImportModel = process.env.POKO_OPENCODE_IMPORT_MODEL;
   oldPiAgentDir = process.env.PI_CODING_AGENT_DIR;
   oldPiImportModel = process.env.POKO_PI_IMPORT_MODEL;
+  oldHermesHome = process.env.HERMES_HOME;
+  oldOpenClawStateDir = process.env.OPENCLAW_STATE_DIR;
   process.env.CODEX_HOME = codexHome;
   process.env.CLAUDE_HOME = claudeHome;
   process.env.CLAUDE_CONFIG_DIR = claudeHome;
@@ -73,6 +81,8 @@ beforeEach(async () => {
   process.env.POKO_OPENCODE_IMPORT_MODEL = "opencode/big-pickle";
   process.env.PI_CODING_AGENT_DIR = piHome;
   process.env.POKO_PI_IMPORT_MODEL = "anthropic/claude-sonnet-4-5";
+  process.env.HERMES_HOME = hermesHome;
+  process.env.OPENCLAW_STATE_DIR = openClawStateDir;
   delete process.env.POKO_OPENCODE_BIN;
   createCursorGlobalStateDb(cursorGlobalStateDbPath);
   createT3CodeStateDb(t3DbPath);
@@ -108,11 +118,15 @@ afterEach(async () => {
   restoreEnv("POKO_OPENCODE_IMPORT_MODEL", oldOpenCodeImportModel);
   restoreEnv("PI_CODING_AGENT_DIR", oldPiAgentDir);
   restoreEnv("POKO_PI_IMPORT_MODEL", oldPiImportModel);
+  restoreEnv("HERMES_HOME", oldHermesHome);
+  restoreEnv("OPENCLAW_STATE_DIR", oldOpenClawStateDir);
   await removeTempDir(cwd);
   await removeTempDir(codexHome);
   await removeTempDir(claudeHome);
   await removeTempDir(cursorStorage);
   await removeTempDir(piHome);
+  await removeTempDir(hermesHome);
+  await removeTempDir(openClawStateDir);
   await removeTempDir(path.dirname(cursorGlobalStateDbPath));
   await removeTempDir(path.dirname(t3DbPath));
 });
@@ -179,6 +193,24 @@ describe("poko sync", () => {
     expect(results.map((result) => result.path)).toContain("AGENTS.md");
   });
 
+  test("supports Hermes and OpenClaw aliases", async () => {
+    const hermesResults = await runSync({
+      cwd,
+      agent: "hermes-agent",
+      dryRun: true,
+      logger: createMemoryLogger(),
+    });
+    const openClawResults = await runSync({
+      cwd,
+      agent: "claw",
+      dryRun: true,
+      logger: createMemoryLogger(),
+    });
+
+    expect(hermesResults.map((result) => result.path)).toContain("AGENTS.md");
+    expect(openClawResults.map((result) => result.path)).toContain("AGENTS.md");
+  });
+
   test("does not generate static files without user-provided context", async () => {
     await rm(path.join(cwd, ".poko/rules.md"), { force: true });
     await rm(path.join(cwd, ".poko/mcp.json"), { force: true });
@@ -238,7 +270,16 @@ describe("poko sync", () => {
     const results = await syncNativeHistoryTargets({
       root: cwd,
       config,
-      targetAgents: ["codex", "claude", "cursor", "t3code", "opencode", "pi"],
+      targetAgents: [
+        "codex",
+        "claude",
+        "cursor",
+        "t3code",
+        "opencode",
+        "pi",
+        "hermes",
+        "openclaw",
+      ],
       dryRun: true,
       sessions: [
         makeRawSession({ id: "codex-same", sourceAgent: "codex" }),
@@ -247,12 +288,14 @@ describe("poko sync", () => {
         makeRawSession({ id: "t3-same", sourceAgent: "t3code" }),
         makeRawSession({ id: "opencode-same", sourceAgent: "opencode" }),
         makeRawSession({ id: "pi-same", sourceAgent: "pi" }),
+        makeRawSession({ id: "hermes-same", sourceAgent: "hermes" }),
+        makeRawSession({ id: "openclaw-same", sourceAgent: "openclaw" }),
       ],
     });
 
     for (const result of results) {
       expect(result.details?.sessionsSkippedFromSameAgent).toBe(1);
-      expect(result.sessions).toBe(5);
+      expect(result.sessions).toBe(7);
     }
   });
 
@@ -703,6 +746,114 @@ describe("poko sync", () => {
       },
     });
   });
+
+  test("syncs Codex project history into Hermes native history", async () => {
+    await configureRepoHistoryStore();
+    await seedCodexSession();
+    await seedStalePokoHermesImport();
+    const logger = createMemoryLogger();
+
+    await runSync({
+      cwd,
+      agent: "hermes",
+      logger,
+    });
+
+    expect(logger.messages.join("\n")).toContain(
+      "synced 1 session(s), 2 message(s) into hermes native history",
+    );
+    expect(logger.messages.join("\n")).toContain("staleSessionsRemoved=1");
+
+    const database = new Database(path.join(hermesHome, "state.db"), {
+      readonly: true,
+    });
+    try {
+      expect(
+        database
+          .query("select title, source from sessions where source = ?")
+          .all("poko"),
+      ).toEqual([{ title: "Sync history", source: "poko" }]);
+      expect(
+        database.query("select role, content from messages order by id").all(),
+      ).toEqual([
+        { role: "user", content: "sync chats too" },
+        { role: "assistant", content: "history synced" },
+      ]);
+    } finally {
+      database.close();
+    }
+
+    const captured = await runCapture({
+      cwd,
+      agent: "hermes",
+      store: "repo",
+      logger: createMemoryLogger(),
+    });
+    expect(captured).toBe(0);
+  });
+
+  test("syncs Codex project history into OpenClaw native history", async () => {
+    await configureRepoHistoryStore();
+    await seedCodexSession();
+    const canonicalCwd = await canonicalPath(cwd);
+    await seedStalePokoOpenClawImport(canonicalCwd);
+    const logger = createMemoryLogger();
+
+    await runSync({
+      cwd,
+      agent: "openclaw",
+      logger,
+    });
+
+    expect(logger.messages.join("\n")).toContain(
+      "synced 1 session(s), 2 message(s) into openclaw native history",
+    );
+    expect(logger.messages.join("\n")).toContain("staleSessionFilesRemoved=1");
+
+    const sessionDir = path.join(
+      openClawStateDir,
+      "agents",
+      "main",
+      "sessions",
+    );
+    const sessionFiles = (await listFiles(sessionDir)).filter((filePath) =>
+      filePath.endsWith(".jsonl"),
+    );
+    expect(sessionFiles).toHaveLength(1);
+
+    const rows = (await readFile(sessionFiles[0] ?? "", "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(rows[0]).toMatchObject({
+      type: "session",
+      version: 3,
+      cwd: canonicalCwd,
+    });
+    expect(rows[1]).toMatchObject({
+      type: "custom",
+      customType: "poko.import",
+    });
+    expect(rows[2]).toMatchObject({
+      type: "session_info",
+      name: "Sync history",
+    });
+    expect(rows[3]).toMatchObject({
+      type: "message",
+      message: { role: "user", content: "sync chats too" },
+    });
+    expect(rows[4]).toMatchObject({
+      type: "message",
+      message: { role: "assistant" },
+    });
+
+    const sessionStore = JSON.parse(
+      await readFile(path.join(sessionDir, "sessions.json"), "utf8"),
+    ) as Record<string, { sessionId: string; displayName: string }>;
+    expect(Object.values(sessionStore)).toEqual([
+      expect.objectContaining({ displayName: "Sync history" }),
+    ]);
+  });
 });
 
 const makeRawSession = (
@@ -1089,6 +1240,152 @@ const seedStalePokoPiImport = async (canonicalCwd: string): Promise<void> => {
         },
       }),
     ].join("\n"),
+    "utf8",
+  );
+};
+
+const seedStalePokoHermesImport = async (): Promise<void> => {
+  const dbPath = path.join(hermesHome, "state.db");
+  const database = new Database(dbPath);
+
+  try {
+    createHermesStateSchema(database);
+    database
+      .query(
+        "insert into sessions (id, source, model_config, started_at, title) values (?, ?, ?, ?, ?)",
+      )
+      .run(
+        "stale-hermes-session",
+        "poko",
+        JSON.stringify({
+          pokoImport: {
+            originator: "poko",
+            projectRoot: await canonicalPath(cwd),
+          },
+        }),
+        1,
+        "Old Poko import",
+      );
+    database
+      .query(
+        "insert into messages (session_id, role, content, timestamp) values (?, ?, ?, ?)",
+      )
+      .run("stale-hermes-session", "user", "stale", 1);
+  } finally {
+    database.close();
+  }
+};
+
+const createHermesStateSchema = (database: Database): void => {
+  database.run(`
+    create table if not exists schema_version (
+      version integer not null
+    )
+  `);
+  database.run(`
+    create table if not exists sessions (
+      id text primary key,
+      source text not null,
+      user_id text,
+      model text,
+      model_config text,
+      system_prompt text,
+      parent_session_id text,
+      started_at real not null,
+      ended_at real,
+      end_reason text,
+      message_count integer default 0,
+      tool_call_count integer default 0,
+      input_tokens integer default 0,
+      output_tokens integer default 0,
+      cache_read_tokens integer default 0,
+      cache_write_tokens integer default 0,
+      reasoning_tokens integer default 0,
+      billing_provider text,
+      billing_base_url text,
+      billing_mode text,
+      estimated_cost_usd real,
+      actual_cost_usd real,
+      cost_status text,
+      cost_source text,
+      pricing_version text,
+      title text,
+      api_call_count integer default 0,
+      handoff_state text,
+      handoff_platform text,
+      handoff_error text
+    )
+  `);
+  database.run(`
+    create table if not exists messages (
+      id integer primary key autoincrement,
+      session_id text not null references sessions(id),
+      role text not null,
+      content text,
+      tool_call_id text,
+      tool_calls text,
+      tool_name text,
+      timestamp real not null,
+      token_count integer,
+      finish_reason text,
+      reasoning text,
+      reasoning_content text,
+      reasoning_details text,
+      codex_reasoning_items text,
+      codex_message_items text,
+      platform_message_id text,
+      observed integer default 0
+    )
+  `);
+};
+
+const seedStalePokoOpenClawImport = async (
+  canonicalCwd: string,
+): Promise<void> => {
+  const sessionDir = path.join(openClawStateDir, "agents", "main", "sessions");
+  const stalePath = path.join(
+    sessionDir,
+    "2026-05-28T00-00-00-000Z_ses_stale.jsonl",
+  );
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(
+    stalePath,
+    [
+      JSON.stringify({
+        type: "session",
+        version: 3,
+        id: "ses_stale",
+        timestamp: "2026-05-28T00:00:00.000Z",
+        cwd: canonicalCwd,
+      }),
+      JSON.stringify({
+        type: "custom",
+        id: "10000000",
+        parentId: null,
+        timestamp: "2026-05-28T00:00:00.000Z",
+        customType: "poko.import",
+        data: {
+          originator: "poko",
+          projectRoot: canonicalCwd,
+        },
+      }),
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    path.join(sessionDir, "sessions.json"),
+    `${JSON.stringify(
+      {
+        "poko:codex:stale": {
+          sessionId: "ses_stale",
+          updatedAt: Date.parse("2026-05-28T00:00:00.000Z"),
+          sessionFile: path.basename(stalePath),
+          displayName: "Old Poko import",
+        },
+      },
+      null,
+      2,
+    )}\n`,
     "utf8",
   );
 };

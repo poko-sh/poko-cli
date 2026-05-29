@@ -3,6 +3,8 @@ import { claudeAdapter } from "./claude.ts";
 import { codexAdapter } from "./codex.ts";
 import { copilotAdapter } from "./copilot.ts";
 import { cursorAdapter } from "./cursor.ts";
+import { hermesAdapter } from "./hermes.ts";
+import { openClawAdapter } from "./openclaw.ts";
 import { openCodeAdapter } from "./opencode.ts";
 import { piAdapter } from "./pi.ts";
 import { t3CodeAdapter } from "./t3code.ts";
@@ -16,6 +18,8 @@ export const ADAPTERS: AgentAdapter[] = [
   t3CodeAdapter,
   openCodeAdapter,
   piAdapter,
+  hermesAdapter,
+  openClawAdapter,
   codexAdapter,
 ];
 
