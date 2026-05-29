@@ -38,6 +38,13 @@ export const runExport = async (
   const context = await loadPokoContext(options.cwd);
   const operations = adapter.render(context, { config: context.config });
 
+  if (operations.length === 0) {
+    options.logger.info(
+      `nothing to export for ${agent}; add source context under .poko/ first.`,
+    );
+    return options.stdout ? "" : [];
+  }
+
   if (options.stdout) {
     const rendered = renderOperationsForStdout(operations);
     options.logger.plain(rendered);

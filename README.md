@@ -11,6 +11,7 @@ It can also capture local chat/session history from coding agents into a portabl
 ```sh
 bun install
 bun src/cli.ts init
+# add .poko/rules.md, .poko/mcp.json, or other source context when you need it
 bun src/cli.ts sync --all
 ```
 
@@ -49,15 +50,17 @@ Useful aliases:
 ```text
 .poko/
   poko.json
-  rules.md
-  memory.md
-  style.md
-  stack.md
-  mcp.json
-  skills/
+  rules.md       optional
+  memory.md      optional
+  style.md       optional
+  stack.md       optional
+  mcp.json       optional
+  skills/        optional
 ```
 
-Edit `.poko/`, then run `poko sync`.
+`poko init` only creates `.poko/poko.json`. Add the optional files yourself
+when you actually have context to sync. Missing files mean Poko has nothing to
+export for that context type.
 
 This repository commits `.poko/` as the source of truth and ignores generated
 agent outputs such as `CLAUDE.md`, `AGENTS.md`, `.cursor/`, and `opencode.json`.

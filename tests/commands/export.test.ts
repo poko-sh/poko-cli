@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import { runExport } from "../../src/commands/export.ts";
 import { runInit } from "../../src/commands/init.ts";
 import { createMemoryLogger, makeTempDir, removeTempDir } from "../helpers.ts";
@@ -8,6 +10,11 @@ let cwd: string;
 beforeEach(async () => {
   cwd = await makeTempDir();
   await runInit({ cwd, logger: createMemoryLogger() });
+  await writeFile(
+    path.join(cwd, ".poko/rules.md"),
+    "# Project Rules\n\nUse the project rules.\n",
+    "utf8",
+  );
 });
 
 afterEach(async () => {

@@ -20,6 +20,11 @@ beforeEach(async () => {
   cwd = await makeTempDir();
   await runInit({ cwd, logger: createMemoryLogger() });
   await writeFile(
+    path.join(cwd, ".poko/rules.md"),
+    "# Project Rules\n\nUse the project rules.\n",
+    "utf8",
+  );
+  await writeFile(
     path.join(cwd, ".poko/mcp.json"),
     JSON.stringify({
       mcpServers: {

@@ -74,12 +74,14 @@ const reportInitResults = (results: InitResult[], logger: Logger): void => {
   ).length;
 
   if (created > 0 || overwritten > 0) {
-    logger.success(`packed .poko/ with ${created + overwritten} file(s).`);
+    logger.success(`initialized .poko/ with ${created + overwritten} file(s).`);
   }
 
   if (skipped > 0) {
     logger.info(`left ${skipped} existing file(s) untouched.`);
   }
 
-  logger.info("next: edit .poko/*.md, then run `poko sync --all`.");
+  logger.info(
+    "next: add .poko/rules.md, .poko/mcp.json, or other context only when you have something to sync.",
+  );
 };

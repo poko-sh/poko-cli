@@ -1,4 +1,4 @@
-import { renderFullContext } from "../core/compiler.ts";
+import { hasProjectContext, renderFullContext } from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import type { AgentAdapter } from "./types.ts";
 
@@ -14,6 +14,10 @@ export const antigravityAdapter: AgentAdapter = {
     });
   },
   render(context) {
+    if (!hasProjectContext(context)) {
+      return [];
+    }
+
     const content = renderFullContext(context, "Google Agent Project Context");
 
     return [

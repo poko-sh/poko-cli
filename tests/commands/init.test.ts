@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { runInit } from "../../src/commands/init.ts";
 import { createMemoryLogger, makeTempDir, removeTempDir } from "../helpers.ts";
@@ -15,32 +15,36 @@ afterEach(async () => {
 });
 
 describe("poko init", () => {
-  test("creates the canonical .poko folder", async () => {
+  test("creates only the Poko registry config", async () => {
     const logger = createMemoryLogger();
     const results = await runInit({ cwd, logger });
 
     expect(results.every((result) => result.action === "created")).toBe(true);
+    expect(results.map((result) => result.path)).toEqual([".poko/poko.json"]);
     expect(await readFile(path.join(cwd, ".poko/poko.json"), "utf8")).toContain(
       '"schemaVersion": 1',
     );
-    expect(await readFile(path.join(cwd, ".poko/rules.md"), "utf8")).toContain(
-      "# Project Rules",
+    expect(await Bun.file(path.join(cwd, ".poko/rules.md")).exists()).toBe(
+      false,
+    );
+    expect(await Bun.file(path.join(cwd, ".poko/mcp.json")).exists()).toBe(
+      false,
     );
     expect(
-      await readFile(path.join(cwd, ".poko/skills/README.md"), "utf8"),
-    ).toContain("Project Skills");
+      await Bun.file(path.join(cwd, ".poko/skills/README.md")).exists(),
+    ).toBe(false);
   });
 
   test("does not overwrite existing files unless forced", async () => {
     await runInit({ cwd, logger: createMemoryLogger() });
-    await writeFile(path.join(cwd, ".poko/rules.md"), "custom rules\n", "utf8");
+    const original = await readFile(path.join(cwd, ".poko/poko.json"), "utf8");
 
     const skipped = await runInit({ cwd, logger: createMemoryLogger() });
     expect(
-      skipped.find((result) => result.path === ".poko/rules.md")?.action,
+      skipped.find((result) => result.path === ".poko/poko.json")?.action,
     ).toBe("skipped");
-    expect(await readFile(path.join(cwd, ".poko/rules.md"), "utf8")).toBe(
-      "custom rules\n",
+    expect(await readFile(path.join(cwd, ".poko/poko.json"), "utf8")).toBe(
+      original,
     );
 
     const forced = await runInit({
@@ -49,10 +53,10 @@ describe("poko init", () => {
       logger: createMemoryLogger(),
     });
     expect(
-      forced.find((result) => result.path === ".poko/rules.md")?.action,
+      forced.find((result) => result.path === ".poko/poko.json")?.action,
     ).toBe("overwritten");
-    expect(await readFile(path.join(cwd, ".poko/rules.md"), "utf8")).toContain(
-      "# Project Rules",
+    expect(await readFile(path.join(cwd, ".poko/poko.json"), "utf8")).toContain(
+      '"schemaVersion": 1',
     );
   });
 });

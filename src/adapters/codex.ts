@@ -1,4 +1,4 @@
-import { renderFullContext } from "../core/compiler.ts";
+import { hasProjectContext, renderFullContext } from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import { hasMcpServers, renderCodexMcpToml } from "./common.ts";
 import type { AgentAdapter, FileOperation } from "./types.ts";
@@ -15,16 +15,18 @@ export const codexAdapter: AgentAdapter = {
     });
   },
   render(context, { config }) {
-    const operations: FileOperation[] = [
-      {
+    const operations: FileOperation[] = [];
+
+    if (hasProjectContext(context)) {
+      operations.push({
         type: "managed-block",
         path: "AGENTS.md",
         content: renderFullContext(context, "Agent Project Context"),
         marker: "poko",
         commentStyle: "html",
         label: "AGENTS.md context",
-      },
-    ];
+      });
+    }
 
     if (config.adapters.codex.mcp && hasMcpServers(context)) {
       operations.push({

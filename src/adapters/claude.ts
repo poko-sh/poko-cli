@@ -1,4 +1,8 @@
-import { renderFullContext, renderSkillForClaude } from "../core/compiler.ts";
+import {
+  hasProjectContext,
+  renderFullContext,
+  renderSkillForClaude,
+} from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import { hasMcpServers, renderMcpJson } from "./common.ts";
 import type { AgentAdapter, FileOperation } from "./types.ts";
@@ -15,16 +19,18 @@ export const claudeAdapter: AgentAdapter = {
     });
   },
   render(context, { config }) {
-    const operations: FileOperation[] = [
-      {
+    const operations: FileOperation[] = [];
+
+    if (hasProjectContext(context)) {
+      operations.push({
         type: "managed-block" as const,
         path: "CLAUDE.md",
         content: renderFullContext(context, "Claude Project Context"),
         marker: "poko",
         commentStyle: "html" as const,
         label: "Claude project memory",
-      },
-    ];
+      });
+    }
 
     if (config.adapters.claude.mcp && hasMcpServers(context)) {
       operations.push({

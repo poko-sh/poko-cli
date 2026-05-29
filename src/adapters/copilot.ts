@@ -1,4 +1,4 @@
-import { renderFullContext } from "../core/compiler.ts";
+import { hasProjectContext, renderFullContext } from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import { hasMcpServers, renderVsCodeMcpJson } from "./common.ts";
 import type { AgentAdapter, FileOperation } from "./types.ts";
@@ -19,16 +19,18 @@ export const copilotAdapter: AgentAdapter = {
     });
   },
   render(context, { config }) {
-    const operations: FileOperation[] = [
-      {
+    const operations: FileOperation[] = [];
+
+    if (hasProjectContext(context)) {
+      operations.push({
         type: "managed-block",
         path: ".github/copilot-instructions.md",
         content: renderFullContext(context, "GitHub Copilot Project Context"),
         marker: "poko",
         commentStyle: "html",
         label: "GitHub Copilot custom instructions",
-      },
-    ];
+      });
+    }
 
     if (config.adapters.copilot.mcp && hasMcpServers(context)) {
       operations.push({

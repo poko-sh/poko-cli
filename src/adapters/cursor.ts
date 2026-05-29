@@ -1,4 +1,4 @@
-import { renderFullContext } from "../core/compiler.ts";
+import { hasProjectContext, renderFullContext } from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import { hasMcpServers, renderMcpJson } from "./common.ts";
 import type { AgentAdapter, FileOperation } from "./types.ts";
@@ -15,6 +15,21 @@ export const cursorAdapter: AgentAdapter = {
     });
   },
   render(context, { config }) {
+    const operations: FileOperation[] = [];
+
+    if (!hasProjectContext(context)) {
+      if (config.adapters.cursor.mcp && hasMcpServers(context)) {
+        operations.push({
+          type: "json-merge",
+          path: ".cursor/mcp.json",
+          merge: renderMcpJson(context),
+          label: "Cursor MCP config",
+        });
+      }
+
+      return operations;
+    }
+
     const content = `---
 description: Poko project context. Use when working in this repository.
 globs:
@@ -23,14 +38,12 @@ alwaysApply: true
 
 ${renderFullContext(context, "Cursor Project Context")}`;
 
-    const operations: FileOperation[] = [
-      {
-        type: "replace",
-        path: ".cursor/rules/poko.mdc",
-        content,
-        label: "Cursor project rule",
-      },
-    ];
+    operations.push({
+      type: "replace",
+      path: ".cursor/rules/poko.mdc",
+      content,
+      label: "Cursor project rule",
+    });
 
     if (config.adapters.cursor.legacyCursorrules) {
       operations.push({

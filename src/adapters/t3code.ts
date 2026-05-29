@@ -1,4 +1,8 @@
-import { renderFullContext, renderSkillForClaude } from "../core/compiler.ts";
+import {
+  hasProjectContext,
+  renderFullContext,
+  renderSkillForClaude,
+} from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import type { AgentAdapter, FileOperation } from "./types.ts";
 
@@ -14,16 +18,18 @@ export const t3CodeAdapter: AgentAdapter = {
     });
   },
   render(context, { config }) {
-    const operations: FileOperation[] = [
-      {
+    const operations: FileOperation[] = [];
+
+    if (hasProjectContext(context)) {
+      operations.push({
         type: "managed-block",
         path: "AGENTS.md",
         content: renderFullContext(context, "Agent Project Context"),
         marker: "poko",
         commentStyle: "html",
         label: "T3 Code agent context",
-      },
-    ];
+      });
+    }
 
     if (config.adapters.t3code.skills) {
       for (const skill of context.skills) {

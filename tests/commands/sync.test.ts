@@ -7,6 +7,7 @@ import {
   readdir,
   readFile,
   realpath,
+  rm,
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
@@ -66,6 +67,11 @@ beforeEach(async () => {
   createCursorGlobalStateDb(cursorGlobalStateDbPath);
   createT3CodeStateDb(t3DbPath);
   await runInit({ cwd, logger: createMemoryLogger() });
+  await writeFile(
+    path.join(cwd, ".poko/rules.md"),
+    "# Project Rules\n\nUse the project rules.\n",
+    "utf8",
+  );
   await writeFile(
     path.join(cwd, ".poko/mcp.json"),
     JSON.stringify({
@@ -146,6 +152,33 @@ describe("poko sync", () => {
     });
 
     expect(results.map((result) => result.path)).toContain("AGENTS.md");
+  });
+
+  test("does not generate static files without user-provided context", async () => {
+    await rm(path.join(cwd, ".poko/rules.md"), { force: true });
+    await rm(path.join(cwd, ".poko/mcp.json"), { force: true });
+
+    const results = await runSync({
+      cwd,
+      agent: "cursor",
+      dryRun: true,
+      logger: createMemoryLogger(),
+    });
+
+    expect(results).toEqual([]);
+  });
+
+  test("syncs only MCP config when MCP is the only source", async () => {
+    await rm(path.join(cwd, ".poko/rules.md"), { force: true });
+
+    const results = await runSync({
+      cwd,
+      agent: "cursor",
+      dryRun: true,
+      logger: createMemoryLogger(),
+    });
+
+    expect(results.map((result) => result.path)).toEqual([".cursor/mcp.json"]);
   });
 
   test("syncs project history into T3 Code native history", async () => {

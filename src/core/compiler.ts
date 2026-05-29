@@ -9,6 +9,10 @@ export const renderFullContext = (
   context: PokoContext,
   title = "Poko Context",
 ): string => {
+  if (!hasAnyContext(context)) {
+    return "";
+  }
+
   const parts = [
     `# ${title}`,
     "Generated from `.poko/`. Edit `.poko/`, then run `poko sync`.",
@@ -24,16 +28,29 @@ export const renderFullContext = (
 };
 
 export const renderConventions = (context: PokoContext): string => {
-  const parts = [
-    "# Poko Conventions",
+  const sections = [
     renderSection("Project Rules", context.sections.rules),
     renderSection("Coding Style", context.sections.style),
     renderSection("Tech Stack", context.sections.stack),
     renderSection("Project Memory", context.sections.memory),
   ].filter(Boolean);
 
+  if (sections.length === 0) {
+    return "";
+  }
+
+  const parts = ["# Poko Conventions", ...sections];
+
   return `${parts.join("\n\n").trim()}\n`;
 };
+
+export const hasProjectContext = (context: PokoContext): boolean =>
+  Object.values(context.sections).some((section) =>
+    Boolean(stripTemplateComments(stripFirstHeading(section))),
+  ) || context.skills.length > 0;
+
+const hasAnyContext = (context: PokoContext): boolean =>
+  hasProjectContext(context) || Object.keys(context.mcpServers).length > 0;
 
 export const renderSkillForClaude = (skill: PokoSkill): string => {
   if (skill.content.startsWith("---")) {
