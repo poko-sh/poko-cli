@@ -32,6 +32,9 @@ poko doctor [--json]
 poko handoff <agent> [--stdout] [--raw] [--limit 5]
 ```
 
+Add `--private-display` to any command, or set `POKO_PRIVATE_DISPLAY=1`, when
+you want CLI output to hide email-like values without changing auth state.
+
 Supported agents:
 
 - `claude`

@@ -9,8 +9,10 @@ import { runInit } from "./commands/init.ts";
 import { runSync, runSyncReport } from "./commands/sync.ts";
 import {
   createLogger,
+  createPrivateDisplayLogger,
   createSilentLogger,
   type Logger,
+  redactPersonalInfo,
 } from "./core/logger.ts";
 
 type ParsedArgs = {
@@ -26,34 +28,55 @@ export const run = async (
 ): Promise<number> => {
   const parsed = parseArgs(argv);
   const json = Boolean(parsed.flags.json);
+  const privateDisplay = shouldUsePrivateDisplay(parsed.flags);
+  const outputLogger = privateDisplay
+    ? createPrivateDisplayLogger(logger)
+    : logger;
 
-  if (!parsed.command) {
-    logger.plain(helpText());
-    return 0;
-  }
-
-  switch (parsed.command) {
-    case "init":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(initHelpText());
-        return 0;
-      }
-
-      await runInit({
-        cwd,
-        force: Boolean(parsed.flags.force),
-        yes: Boolean(parsed.flags.yes),
-        logger,
-      });
+  try {
+    if (!parsed.command) {
+      outputLogger.plain(helpText());
       return 0;
-    case "sync":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(syncHelpText());
-        return 0;
-      }
+    }
 
-      if (json) {
-        const report = await runSyncReport({
+    switch (parsed.command) {
+      case "init":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(initHelpText());
+          return 0;
+        }
+
+        await runInit({
+          cwd,
+          force: Boolean(parsed.flags.force),
+          yes: Boolean(parsed.flags.yes),
+          logger: outputLogger,
+        });
+        return 0;
+      case "sync":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(syncHelpText());
+          return 0;
+        }
+
+        if (json) {
+          const report = await runSyncReport({
+            cwd,
+            agent: flagString(parsed.flags.agent),
+            all: Boolean(parsed.flags.all),
+            global: Boolean(parsed.flags.global),
+            dryRun: Boolean(parsed.flags["dry-run"]),
+            noHistory: Boolean(parsed.flags["no-history"]),
+            backup: Boolean(parsed.flags.backup),
+            diff: Boolean(parsed.flags.diff),
+            quiet: true,
+            logger: createSilentLogger(),
+          });
+          outputLogger.plain(toJson(report));
+          return 0;
+        }
+
+        await runSync({
           cwd,
           agent: flagString(parsed.flags.agent),
           all: Boolean(parsed.flags.all),
@@ -62,167 +85,160 @@ export const run = async (
           noHistory: Boolean(parsed.flags["no-history"]),
           backup: Boolean(parsed.flags.backup),
           diff: Boolean(parsed.flags.diff),
-          quiet: true,
-          logger: createSilentLogger(),
+          logger: outputLogger,
         });
-        logger.plain(toJson(report));
         return 0;
-      }
+      case "export":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(exportHelpText());
+          return 0;
+        }
 
-      await runSync({
-        cwd,
-        agent: flagString(parsed.flags.agent),
-        all: Boolean(parsed.flags.all),
-        global: Boolean(parsed.flags.global),
-        dryRun: Boolean(parsed.flags["dry-run"]),
-        noHistory: Boolean(parsed.flags["no-history"]),
-        backup: Boolean(parsed.flags.backup),
-        diff: Boolean(parsed.flags.diff),
-        logger,
-      });
-      return 0;
-    case "export":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(exportHelpText());
+        await runExport({
+          cwd,
+          agent: parsed.positional[0],
+          stdout: Boolean(parsed.flags.stdout),
+          dryRun: Boolean(parsed.flags["dry-run"]),
+          backup: Boolean(parsed.flags.backup),
+          diff: Boolean(parsed.flags.diff),
+          logger: outputLogger,
+        });
         return 0;
-      }
+      case "capture":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(captureHelpText());
+          return 0;
+        }
 
-      await runExport({
-        cwd,
-        agent: parsed.positional[0],
-        stdout: Boolean(parsed.flags.stdout),
-        dryRun: Boolean(parsed.flags["dry-run"]),
-        backup: Boolean(parsed.flags.backup),
-        diff: Boolean(parsed.flags.diff),
-        logger,
-      });
-      return 0;
-    case "capture":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(captureHelpText());
-        return 0;
-      }
+        if (json) {
+          const report = await runCaptureReport({
+            cwd,
+            agent: parsed.positional[0],
+            all: Boolean(parsed.flags.all),
+            store: flagString(parsed.flags.store),
+            dryRun: Boolean(parsed.flags["dry-run"]),
+            includePrevious: Boolean(parsed.flags["include-previous"]),
+            quiet: true,
+            logger: createSilentLogger(),
+          });
+          outputLogger.plain(toJson(report));
+          return 0;
+        }
 
-      if (json) {
-        const report = await runCaptureReport({
+        await runCapture({
           cwd,
           agent: parsed.positional[0],
           all: Boolean(parsed.flags.all),
           store: flagString(parsed.flags.store),
           dryRun: Boolean(parsed.flags["dry-run"]),
           includePrevious: Boolean(parsed.flags["include-previous"]),
-          quiet: true,
-          logger: createSilentLogger(),
+          logger: outputLogger,
         });
-        logger.plain(toJson(report));
         return 0;
-      }
+      case "history":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(historyHelpText());
+          return 0;
+        }
 
-      await runCapture({
-        cwd,
-        agent: parsed.positional[0],
-        all: Boolean(parsed.flags.all),
-        store: flagString(parsed.flags.store),
-        dryRun: Boolean(parsed.flags["dry-run"]),
-        includePrevious: Boolean(parsed.flags["include-previous"]),
-        logger,
-      });
-      return 0;
-    case "history":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(historyHelpText());
-        return 0;
-      }
+        if (json) {
+          const report = await runHistoryReport({
+            cwd,
+            store: flagString(parsed.flags.store),
+            raw: Boolean(parsed.flags.raw),
+            limit: flagString(parsed.flags.limit),
+            quiet: true,
+            logger: createSilentLogger(),
+          });
+          outputLogger.plain(toJson(report));
+          return 0;
+        }
 
-      if (json) {
-        const report = await runHistoryReport({
+        await runHistory({
           cwd,
           store: flagString(parsed.flags.store),
           raw: Boolean(parsed.flags.raw),
           limit: flagString(parsed.flags.limit),
-          quiet: true,
-          logger: createSilentLogger(),
+          logger: outputLogger,
         });
-        logger.plain(toJson(report));
         return 0;
-      }
+      case "doctor":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(doctorHelpText());
+          return 0;
+        }
 
-      await runHistory({
-        cwd,
-        store: flagString(parsed.flags.store),
-        raw: Boolean(parsed.flags.raw),
-        limit: flagString(parsed.flags.limit),
-        logger,
-      });
-      return 0;
-    case "doctor":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(doctorHelpText());
-        return 0;
-      }
+        if (json) {
+          const report = await runDoctor({
+            cwd,
+            logger: createSilentLogger(),
+          });
+          outputLogger.plain(
+            toJson(report ?? uninitializedReport("doctor", cwd)),
+          );
+          return 0;
+        }
 
-      if (json) {
-        const report = await runDoctor({
+        await runDoctor({
           cwd,
-          logger: createSilentLogger(),
+          logger: outputLogger,
         });
-        logger.plain(toJson(report ?? uninitializedReport("doctor", cwd)));
         return 0;
-      }
+      case "status":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(statusHelpText());
+          return 0;
+        }
 
-      await runDoctor({
-        cwd,
-        logger,
-      });
-      return 0;
-    case "status":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(statusHelpText());
-        return 0;
-      }
+        if (json) {
+          const report = await runDoctor({
+            cwd,
+            logger: createSilentLogger(),
+            compact: true,
+          });
+          outputLogger.plain(
+            toJson(
+              report
+                ? { ...report, command: "status" }
+                : uninitializedReport("status", cwd),
+            ),
+          );
+          return 0;
+        }
 
-      if (json) {
-        const report = await runDoctor({
+        await runDoctor({
           cwd,
-          logger: createSilentLogger(),
+          logger: outputLogger,
           compact: true,
         });
-        logger.plain(
-          toJson(
-            report
-              ? { ...report, command: "status" }
-              : uninitializedReport("status", cwd),
-          ),
+        return 0;
+      case "handoff":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(handoffHelpText());
+          return 0;
+        }
+
+        await runHandoff({
+          cwd,
+          agent: parsed.positional[0],
+          store: flagString(parsed.flags.store),
+          limit: flagString(parsed.flags.limit),
+          raw: Boolean(parsed.flags.raw),
+          stdout: Boolean(parsed.flags.stdout),
+          logger: outputLogger,
+        });
+        return 0;
+      default:
+        throw new Error(
+          `Unknown command "${parsed.command}". Run \`poko --help\`.`,
         );
-        return 0;
-      }
+    }
+  } catch (error) {
+    if (!privateDisplay) {
+      throw error;
+    }
 
-      await runDoctor({
-        cwd,
-        logger,
-        compact: true,
-      });
-      return 0;
-    case "handoff":
-      if (parsed.flags.help || parsed.flags.h) {
-        logger.plain(handoffHelpText());
-        return 0;
-      }
-
-      await runHandoff({
-        cwd,
-        agent: parsed.positional[0],
-        store: flagString(parsed.flags.store),
-        limit: flagString(parsed.flags.limit),
-        raw: Boolean(parsed.flags.raw),
-        stdout: Boolean(parsed.flags.stdout),
-        logger,
-      });
-      return 0;
-    default:
-      throw new Error(
-        `Unknown command "${parsed.command}". Run \`poko --help\`.`,
-      );
+    throw redactThrownError(error);
   }
 };
 
@@ -274,6 +290,24 @@ const expectsValue = (flag: string): boolean =>
 const flagString = (value: string | boolean | undefined): string | undefined =>
   typeof value === "string" ? value : undefined;
 
+const shouldUsePrivateDisplay = (
+  flags: Record<string, string | boolean>,
+): boolean =>
+  Boolean(flags["private-display"] || flags["hide-personal-info"]) ||
+  process.env.POKO_PRIVATE_DISPLAY === "1";
+
+const redactThrownError = (error: unknown): Error => {
+  const source = error instanceof Error ? error : new Error(String(error));
+  const redacted = new Error(redactPersonalInfo(source.message));
+  redacted.name = source.name;
+
+  if (source.stack) {
+    redacted.stack = redactPersonalInfo(source.stack);
+  }
+
+  return redacted;
+};
+
 const toJson = (value: unknown): string =>
   `${JSON.stringify(value, null, 2)}\n`;
 
@@ -299,6 +333,9 @@ Usage:
   poko status [--json]
   poko doctor [--json]
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
+
+Global options:
+  --private-display      Hide email-like values in CLI output
 
 Agents:
   claude, cursor, antigravity, copilot, t3code, opencode, pi, hermes, openclaw, codex
@@ -409,7 +446,10 @@ Options:
 `;
 
 if (import.meta.main) {
-  const logger = createLogger();
+  const rawLogger = createLogger();
+  const logger = shouldUsePrivateDisplay(parseArgs(process.argv.slice(2)).flags)
+    ? createPrivateDisplayLogger(rawLogger)
+    : rawLogger;
 
   run(process.argv.slice(2), process.cwd(), logger).catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));

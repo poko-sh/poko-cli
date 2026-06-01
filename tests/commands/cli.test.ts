@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { run } from "../../src/cli.ts";
 import { createMemoryLogger, makeTempDir, removeTempDir } from "../helpers.ts";
 
@@ -49,9 +51,42 @@ describe("cli", () => {
     }
   });
 
+  test("hides email-like values when private display is enabled", async () => {
+    const tempRoot = await makeTempDir();
+    const cwd = path.join(tempRoot, "fraser@example.com", "project");
+    const logger = createMemoryLogger();
+
+    try {
+      await mkdir(cwd, { recursive: true });
+      const code = await run(
+        ["status", "--json", "--private-display"],
+        cwd,
+        logger,
+      );
+      const output = logger.messages.join("\n");
+      const parsed = JSON.parse(output) as { root: string };
+
+      expect(code).toBe(0);
+      expect(output).not.toContain("fraser@example.com");
+      expect(parsed.root).toContain("[hidden email]");
+    } finally {
+      await removeTempDir(tempRoot);
+    }
+  });
+
   test("returns an error for unknown commands", async () => {
     await expect(
       run(["nope"], process.cwd(), createMemoryLogger()),
     ).rejects.toThrow("Unknown command");
+  });
+
+  test("hides email-like values in thrown errors when private display is enabled", async () => {
+    await expect(
+      run(
+        ["export", "fraser@example.com", "--private-display"],
+        process.cwd(),
+        createMemoryLogger(),
+      ),
+    ).rejects.toThrow("[hidden email]");
   });
 });

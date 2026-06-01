@@ -8,6 +8,8 @@ export type Logger = {
   plain(message: string): void;
 };
 
+const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+
 export const createLogger = (): Logger => ({
   info(message) {
     console.log(`${pc.cyan("poko")} ${message}`);
@@ -26,6 +28,24 @@ export const createLogger = (): Logger => ({
   },
 });
 
+export const createPrivateDisplayLogger = (logger: Logger): Logger => ({
+  info(message) {
+    logger.info(redactPersonalInfo(message));
+  },
+  success(message) {
+    logger.success(redactPersonalInfo(message));
+  },
+  warn(message) {
+    logger.warn(redactPersonalInfo(message));
+  },
+  error(message) {
+    logger.error(redactPersonalInfo(message));
+  },
+  plain(message) {
+    logger.plain(redactPersonalInfo(message));
+  },
+});
+
 export const createSilentLogger = (): Logger => ({
   info() {},
   success() {},
@@ -33,3 +53,6 @@ export const createSilentLogger = (): Logger => ({
   error() {},
   plain() {},
 });
+
+export const redactPersonalInfo = (value: string): string =>
+  value.replace(emailPattern, "[hidden email]");
