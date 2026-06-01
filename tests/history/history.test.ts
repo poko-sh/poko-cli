@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runCapture } from "../../src/commands/capture.ts";
 import { runHandoff } from "../../src/commands/handoff.ts";
-import { runHistory } from "../../src/commands/history.ts";
+import { runHistory, runHistoryReport } from "../../src/commands/history.ts";
 import { runInit } from "../../src/commands/init.ts";
 import {
   loadHistoryIndex,
@@ -363,6 +363,31 @@ describe("history capture", () => {
     expect(
       await readFile(path.join(cwd, ".poko/handoffs/claude-latest.md"), "utf8"),
     ).toContain("Codex test");
+  });
+
+  test("can include raw sessions in history JSON reports", async () => {
+    await seedCodexSession();
+    await runCapture({
+      cwd,
+      agent: "codex",
+      store: "repo",
+      logger: createMemoryLogger(),
+    });
+
+    const report = await runHistoryReport({
+      cwd,
+      store: "repo",
+      raw: true,
+      limit: "1",
+      logger: createMemoryLogger(),
+    });
+
+    expect(report.entries).toHaveLength(1);
+    expect(report.sessions).toHaveLength(1);
+    expect(report.sessions?.[0]?.title).toBe("Codex test");
+    expect(
+      report.sessions?.[0]?.messages.map((message) => message.text),
+    ).toEqual(["implement capture", "capture implemented"]);
   });
 });
 

@@ -138,6 +138,8 @@ export const run = async (
         const report = await runHistoryReport({
           cwd,
           store: flagString(parsed.flags.store),
+          raw: Boolean(parsed.flags.raw),
+          limit: flagString(parsed.flags.limit),
           quiet: true,
           logger: createSilentLogger(),
         });
@@ -148,6 +150,8 @@ export const run = async (
       await runHistory({
         cwd,
         store: flagString(parsed.flags.store),
+        raw: Boolean(parsed.flags.raw),
+        limit: flagString(parsed.flags.limit),
         logger,
       });
       return 0;
@@ -291,7 +295,7 @@ Usage:
   poko sync --global [--all] [--agent <agent>] [--dry-run] [--json]
   poko export <agent> [--stdout] [--dry-run] [--diff] [--backup]
   poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--include-previous] [--json]
-  poko history [--store local|repo|both] [--json]
+  poko history [--store local|repo|both] [--raw] [--limit <count>] [--json]
   poko status [--json]
   poko doctor [--json]
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
@@ -371,6 +375,8 @@ Lists captured project sessions.
 
 Options:
   --store <store>   local, repo, or both
+  --raw             Include raw session payloads in JSON output
+  --limit <count>   Limit the number of sessions returned
   --json            Print machine-readable history index
 `;
 
