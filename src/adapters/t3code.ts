@@ -1,21 +1,33 @@
+import os from "node:os";
+import path from "node:path";
 import {
   hasProjectContext,
   renderFullContext,
   renderSkillForClaude,
 } from "../core/compiler.ts";
+import { pathExists } from "../core/config.ts";
 import { detectBySignals } from "../core/detect.ts";
 import type { AgentAdapter, FileOperation } from "./types.ts";
 
 export const t3CodeAdapter: AgentAdapter = {
   id: "t3code",
   displayName: "T3 Code",
-  detect(root) {
-    return detectBySignals(root, {
+  async detect(root) {
+    const detection = await detectBySignals(root, {
       id: "t3code",
       displayName: "T3 Code",
       binaries: [],
       projectPaths: [".agents/skills", ".t3code"],
     });
+
+    for (const signal of t3CodeInstallSignals()) {
+      if (await pathExists(signal.path)) {
+        detection.reasons.push(`found ${signal.label}`);
+      }
+    }
+
+    detection.detected = detection.reasons.length > 0;
+    return detection;
   },
   render(context, { config }) {
     const operations: FileOperation[] = [];
@@ -45,3 +57,28 @@ export const t3CodeAdapter: AgentAdapter = {
     return operations;
   },
 };
+
+const t3CodeInstallSignals = (): Array<{ label: string; path: string }> => [
+  {
+    label: "T3 Code state database",
+    path:
+      process.env.POKO_T3CODE_DB_PATH ??
+      path.join(os.homedir(), ".t3", "userdata", "state.sqlite"),
+  },
+  {
+    label: "T3 Code app",
+    path: process.env.POKO_T3CODE_APP_PATH ?? "/Applications/T3 Code.app",
+  },
+  {
+    label: "T3 Code Alpha app",
+    path: "/Applications/T3 Code (Alpha).app",
+  },
+  {
+    label: "user T3 Code app",
+    path: path.join(os.homedir(), "Applications", "T3 Code.app"),
+  },
+  {
+    label: "user T3 Code Alpha app",
+    path: path.join(os.homedir(), "Applications", "T3 Code (Alpha).app"),
+  },
+];

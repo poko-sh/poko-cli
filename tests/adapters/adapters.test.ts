@@ -138,6 +138,27 @@ describe("agent adapters", () => {
     );
   });
 
+  test("detects T3 Code from its native state database", async () => {
+    const oldDbPath = process.env.POKO_T3CODE_DB_PATH;
+    const dbPath = path.join(cwd, "state.sqlite");
+
+    try {
+      await writeFile(dbPath, "", "utf8");
+      process.env.POKO_T3CODE_DB_PATH = dbPath;
+
+      const detection = await t3CodeAdapter.detect(cwd);
+
+      expect(detection.detected).toBe(true);
+      expect(detection.reasons).toContain("found T3 Code state database");
+    } finally {
+      if (oldDbPath === undefined) {
+        delete process.env.POKO_T3CODE_DB_PATH;
+      } else {
+        process.env.POKO_T3CODE_DB_PATH = oldDbPath;
+      }
+    }
+  });
+
   test("renders Pi AGENTS.md and skills", async () => {
     const context = await loadPokoContext(cwd);
     const operations = piAdapter.render(context, {
