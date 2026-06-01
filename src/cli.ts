@@ -6,6 +6,7 @@ import { runExport } from "./commands/export.ts";
 import { runHandoff } from "./commands/handoff.ts";
 import { runHistory, runHistoryReport } from "./commands/history.ts";
 import { runInit } from "./commands/init.ts";
+import { runRestore, runRestoreReport } from "./commands/restore.ts";
 import { runSync, runSyncReport } from "./commands/sync.ts";
 import {
   createLogger,
@@ -63,6 +64,7 @@ export const run = async (
           const report = await runSyncReport({
             cwd,
             agent: flagString(parsed.flags.agent),
+            targets: flagString(parsed.flags.targets),
             all: Boolean(parsed.flags.all),
             global: Boolean(parsed.flags.global),
             dryRun: Boolean(parsed.flags["dry-run"]),
@@ -79,6 +81,7 @@ export const run = async (
         await runSync({
           cwd,
           agent: flagString(parsed.flags.agent),
+          targets: flagString(parsed.flags.targets),
           all: Boolean(parsed.flags.all),
           global: Boolean(parsed.flags.global),
           dryRun: Boolean(parsed.flags["dry-run"]),
@@ -228,6 +231,39 @@ export const run = async (
           logger: outputLogger,
         });
         return 0;
+      case "restore":
+        if (parsed.flags.help || parsed.flags.h) {
+          outputLogger.plain(restoreHelpText());
+          return 0;
+        }
+
+        if (json) {
+          const report = await runRestoreReport({
+            cwd,
+            file: flagString(parsed.flags.file),
+            agent: flagString(parsed.flags.agent),
+            targets: flagString(parsed.flags.targets),
+            all: Boolean(parsed.flags.all),
+            store: flagString(parsed.flags.store),
+            dryRun: Boolean(parsed.flags["dry-run"]),
+            quiet: true,
+            logger: createSilentLogger(),
+          });
+          outputLogger.plain(toJson(report));
+          return 0;
+        }
+
+        await runRestore({
+          cwd,
+          file: flagString(parsed.flags.file),
+          agent: flagString(parsed.flags.agent),
+          targets: flagString(parsed.flags.targets),
+          all: Boolean(parsed.flags.all),
+          store: flagString(parsed.flags.store),
+          dryRun: Boolean(parsed.flags["dry-run"]),
+          logger: outputLogger,
+        });
+        return 0;
       default:
         throw new Error(
           `Unknown command "${parsed.command}". Run \`poko --help\`.`,
@@ -285,7 +321,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 };
 
 const expectsValue = (flag: string): boolean =>
-  ["agent", "store", "limit"].includes(flag);
+  ["agent", "targets", "file", "store", "limit"].includes(flag);
 
 const flagString = (value: string | boolean | undefined): string | undefined =>
   typeof value === "string" ? value : undefined;
@@ -325,14 +361,15 @@ export const helpText =
 
 Usage:
   poko init [--yes] [--force]
-  poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history] [--json]
-  poko sync --global [--all] [--agent <agent>] [--dry-run] [--json]
+  poko sync [--all] [--agent <agent>] [--targets a,b] [--dry-run] [--diff] [--backup] [--no-history] [--json]
+  poko sync --global [--all] [--agent <agent>] [--targets a,b] [--dry-run] [--json]
   poko export <agent> [--stdout] [--dry-run] [--diff] [--backup]
   poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--include-previous] [--json]
   poko history [--store local|repo|both] [--raw] [--limit <count>] [--json]
   poko status [--json]
   poko doctor [--json]
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
+  poko restore --file <path> [--targets a,b] [--all] [--dry-run] [--json]
 
 Global options:
   --private-display      Hide email-like values in CLI output
@@ -371,6 +408,7 @@ With --global, syncs all locally discoverable project chat history into native a
 Options:
   --all             Sync every enabled adapter
   --agent <agent>   Sync one adapter
+  --targets <list>  Sync a comma-separated agent list
   --global          Sync all discoverable local project histories; no static files are written
   --dry-run         Show what would change without writing files
   --diff            With --dry-run, print line-level static file changes
@@ -443,6 +481,20 @@ Options:
   --raw             Include tool/system messages too
   --limit <count>   Number of recent sessions to include
   --store <store>   local, repo, or both
+`;
+
+const restoreHelpText = (): string => `${pc.bold("poko restore")}
+
+Imports Poko raw sessions from a local JSON payload, writes local history, and syncs selected native agent targets.
+
+Options:
+  --file <path>      JSON payload with session or sessions
+  --targets <list>   Comma-separated native targets
+  --agent <agent>    Restore into one native target
+  --all              Restore into every enabled native target
+  --store <store>    local, repo, or both
+  --dry-run          Preview without writing local/native history
+  --json             Print machine-readable restore report
 `;
 
 if (import.meta.main) {

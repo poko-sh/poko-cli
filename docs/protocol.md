@@ -106,6 +106,9 @@ Runs sync and returns file and history outcomes.
 Use `--dry-run --json` for app previews. Use `--backup --json` when the app is
 executing a user-approved write.
 
+The desktop app can pass `--targets claude,cursor,t3code` instead of `--all`
+when the user selects explicit destinations.
+
 ### `poko sync --global --json`
 
 Runs an all-project native history sync. This command does not write static
@@ -192,6 +195,48 @@ Captures project history and reports per-importer counts.
 }
 ```
 
+### `poko restore --json`
+
+Restores raw Poko sessions from a local JSON payload and imports them into
+selected native history targets. The file can contain either `{ "session": {} }`
+or `{ "sessions": [] }`.
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "restore",
+  "mode": "project",
+  "dryRun": false,
+  "agents": ["claude", "cursor"],
+  "files": [],
+  "changedFiles": 0,
+  "history": {
+    "enabled": true,
+    "sessions": [
+      {
+        "id": "session-id",
+        "sourceAgent": "codex",
+        "title": "Same conversation everywhere",
+        "projectRoot": "/path/to/project",
+        "messages": 42
+      }
+    ],
+    "skippedOlderSessions": 0,
+    "nativeTargets": [
+      {
+        "target": "cursor",
+        "location": "~/Library/Application Support/Cursor/...",
+        "sessions": 1,
+        "messages": 42,
+        "dryRun": false,
+        "skipped": false
+      }
+    ]
+  },
+  "warnings": []
+}
+```
+
 ### `poko history --json`
 
 Returns the captured history index for the active project.
@@ -224,7 +269,8 @@ directory when operating on a selected project. The initial app MVP only needs:
 - `history --json` for the latest conversation list
 - `sync --dry-run --json` for preview
 - `sync --backup --json` for user-approved writes
-- `sync --global --all --dry-run --json` for all-project previews
-- `sync --global --all --json` for user-approved all-project writes
+- `sync --global --targets <list> --dry-run --json` for all-project previews
+- `sync --global --targets <list> --json` for user-approved all-project writes
+- `restore --file <path> --targets <list> --json` for cloud restore writes
 
 The app should never parse human logs, ANSI color, or markdown handoff output.

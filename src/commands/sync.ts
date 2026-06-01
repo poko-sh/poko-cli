@@ -29,6 +29,7 @@ import type { RawHistorySession } from "../history/types.ts";
 export type SyncOptions = {
   cwd: string;
   agent?: string;
+  targets?: string;
   all?: boolean;
   global?: boolean;
   dryRun?: boolean;
@@ -41,7 +42,7 @@ export type SyncOptions = {
 
 export type SyncReport = {
   schemaVersion: 1;
-  command: "sync";
+  command: "sync" | "restore";
   mode: "project" | "global";
   generatedAt: string;
   root: string;
@@ -453,6 +454,10 @@ const selectAdapters = async (
     return [getRequiredAdapter(agent)];
   }
 
+  if (options.targets) {
+    return parseAgentList(options.targets).map(getRequiredAdapter);
+  }
+
   const enabledAdapters = ADAPTERS.filter((adapter) =>
     isEnabled(config, adapter.id),
   );
@@ -480,6 +485,10 @@ const selectGlobalTargetAgents = (
   if (options.agent) {
     const agent = parseAgentId(options.agent);
     return isNativeHistoryTarget(agent) ? [agent] : [];
+  }
+
+  if (options.targets) {
+    return parseAgentList(options.targets).filter(isNativeHistoryTarget);
   }
 
   return ADAPTERS.filter((adapter) => isEnabled(config, adapter.id))
@@ -586,6 +595,16 @@ const parseAgentId = (value: string): AgentId => {
   throw new Error(
     `Unknown agent "${value}". Supported agents: ${supportedAgentList()}.`,
   );
+};
+
+const parseAgentList = (value: string): AgentId[] => {
+  const agents = value
+    .split(",")
+    .map((agent) => agent.trim())
+    .filter(Boolean)
+    .map(parseAgentId);
+
+  return [...new Set(agents)];
 };
 
 const getRequiredAdapter = (agent: AgentId): AgentAdapter => {

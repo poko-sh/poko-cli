@@ -22,14 +22,15 @@ bun src/cli.ts sync --all
 
 ```sh
 poko init [--yes] [--force]
-poko sync [--all] [--agent <agent>] [--dry-run] [--diff] [--backup] [--no-history] [--json]
-poko sync --global [--all] [--agent <agent>] [--dry-run] [--json]
+poko sync [--all] [--agent <agent>] [--targets a,b] [--dry-run] [--diff] [--backup] [--no-history] [--json]
+poko sync --global [--all] [--agent <agent>] [--targets a,b] [--dry-run] [--json]
 poko export <agent> [--stdout] [--dry-run] [--diff] [--backup]
 poko capture [agent|--all] [--store local|repo|both] [--dry-run] [--json]
 poko history [--store local|repo|both] [--json]
 poko status [--json]
 poko doctor [--json]
 poko handoff <agent> [--stdout] [--raw] [--limit 5]
+poko restore --file <path> [--targets a,b] [--all] [--dry-run] [--json]
 ```
 
 Add `--private-display` to any command, or set `POKO_PRIVATE_DISPLAY=1`, when
@@ -84,6 +85,8 @@ By default, `--all` syncs every adapter enabled in `.poko/poko.json`. Aider and 
 
 Project sync also captures project-scoped chat/session history from enabled local importers and syncs it into native agent history when that target supports it. Native chat sync currently supports Claude Code, Cursor, T3 Code, OpenCode, Pi, Hermes, OpenClaw, and Codex. Cursor and T3 Code write to local SQLite state, so on macOS Poko warns that it needs to close the app, asks it to quit, waits until it is closed, performs the sync, then reopens it. Use `poko sync --no-history` when you only want static context files.
 
+Use `--targets claude,cursor,t3code` when you want one command to sync a selected set of adapters. For project sync, selected targets receive any supported static context plus native chat history. For global sync and restore, selected targets are filtered to native-history-capable agents.
+
 `poko sync --dry-run` prints the specific project sessions it would include, each native target location, and target-specific details such as stale imports removed, files written, import commands run, and same-agent sessions skipped.
 
 Global sync is explicit because it can touch native history for every local
@@ -100,6 +103,17 @@ syncs those sessions into native target history. The JSON report includes
 `mode: "global"`, a `global.projects` summary, captured agent counts, and
 per-project native target results so the desktop app can preview the operation
 before a write.
+
+Cloud restore uses the same local sync engine. The desktop app downloads raw
+Poko session payloads into a temporary JSON file, then runs:
+
+```sh
+poko restore --file /path/to/sessions.json --targets claude,cursor
+```
+
+`poko restore` writes the sessions back into the configured local history store
+and imports them into the selected native agent targets. It accepts either a
+single `session` or a `sessions` array in Poko raw-session format.
 
 Use `poko sync --dry-run --diff` when you want to preview static file edits line by line. Use `poko sync --backup` or `poko export <agent> --backup` when overwriting existing static files; backups are written under `.poko/backups/` and ignored by default.
 
