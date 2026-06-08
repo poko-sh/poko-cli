@@ -224,6 +224,9 @@ bun run compile:linux-x64
 bun run compile:windows-x64
 ```
 
+See [docs/publishing.md](docs/publishing.md) for the npm-first publishing plan
+and future Homebrew tap strategy.
+
 ## Open Core
 
 Local `init`, `sync`, `export`, `capture`, `history`, and `handoff` are free forever. Pro features such as always-on background capture, cloud sync, AI translation, analytics, marketplace, memory server, and teams are isolated behind a simple license gate for future work.
