@@ -4,6 +4,7 @@ import {
   getHistoryImporter,
   HISTORY_IMPORTERS,
 } from "../history/importers/index.ts";
+import { collapseEquivalentSessions } from "../history/lineage.ts";
 import { writeHistorySessions } from "../history/storage.ts";
 import {
   type HistoryAgent,
@@ -38,6 +39,17 @@ export type CaptureReport = {
   dryRun: boolean;
   includePrevious: boolean;
   capturedSessions: number;
+  entries: Array<{
+    id: string;
+    projectId?: string;
+    sourceAgent: string;
+    title: string;
+    projectRoot: string;
+    createdAt?: string;
+    updatedAt?: string;
+    messageCount: number;
+    sourcePath?: string;
+  }>;
   agents: Array<{
     id: string;
     displayName: string;
@@ -55,6 +67,7 @@ export const runCaptureReport = async (
   const importers = selectImporters(options, config.history.agents);
   let captured = 0;
   const agents: CaptureReport["agents"] = [];
+  const detectedSessions: RawHistorySession[] = [];
 
   for (const importer of importers) {
     if (!options.quiet) {
@@ -68,6 +81,7 @@ export const runCaptureReport = async (
       Boolean(options.includePrevious),
     );
     const stampedSessions = stampProjectIdentity(sessions, config);
+    detectedSessions.push(...stampedSessions);
     captured += sessions.length;
     let writtenEntries = 0;
 
@@ -127,9 +141,26 @@ export const runCaptureReport = async (
     dryRun: Boolean(options.dryRun),
     includePrevious: Boolean(options.includePrevious),
     capturedSessions: captured,
+    entries: collapseEquivalentSessions(detectedSessions)
+      .map(toCaptureEntry)
+      .sort(compareEntries),
     agents,
   };
 };
+
+const toCaptureEntry = (
+  session: RawHistorySession,
+): CaptureReport["entries"][number] => ({
+  id: session.id,
+  projectId: session.projectId,
+  sourceAgent: session.sourceAgent,
+  title: session.title,
+  projectRoot: session.projectRoot,
+  createdAt: session.createdAt,
+  updatedAt: session.updatedAt,
+  messageCount: session.messages.length,
+  sourcePath: session.sourcePath,
+});
 
 const stampProjectIdentity = (
   sessions: RawHistorySession[],
@@ -217,6 +248,14 @@ const reportSkippedSessions = (
     );
   }
 };
+
+const compareEntries = (
+  left: CaptureReport["entries"][number],
+  right: CaptureReport["entries"][number],
+): number =>
+  (right.updatedAt ?? right.createdAt ?? "").localeCompare(
+    left.updatedAt ?? left.createdAt ?? "",
+  );
 
 const selectImporters = (
   options: CaptureOptions,

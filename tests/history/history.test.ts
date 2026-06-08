@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { runCapture } from "../../src/commands/capture.ts";
+import { runCapture, runCaptureReport } from "../../src/commands/capture.ts";
 import { runHandoff } from "../../src/commands/handoff.ts";
 import { runHistory, runHistoryReport } from "../../src/commands/history.ts";
 import { runInit } from "../../src/commands/init.ts";
@@ -145,6 +145,27 @@ describe("history capture", () => {
     expect(output).toContain("- Codex test");
     expect(output).toContain("messages: 2");
     expect(output).toContain("source:");
+  });
+
+  test("includes live capture entries in JSON reports", async () => {
+    await seedCodexSession();
+
+    const report = await runCaptureReport({
+      cwd,
+      all: true,
+      dryRun: true,
+      logger: createMemoryLogger(),
+      quiet: true,
+    });
+
+    expect(report.entries).toEqual([
+      expect.objectContaining({
+        sourceAgent: "codex",
+        title: "Codex test",
+        updatedAt: "2026-05-29T00:00:02.000Z",
+        messageCount: 2,
+      }),
+    ]);
   });
 
   test("skips older same-path sessions from before .poko init", async () => {
