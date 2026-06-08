@@ -121,10 +121,6 @@ const readCursorNativeSessions = async (options: {
     const sessions: RawHistorySession[] = [];
 
     for (const head of heads) {
-      if (isPokoCursorImport(head)) {
-        continue;
-      }
-
       const session = readCursorComposerSession({
         database: globalDatabase,
         head,
@@ -209,7 +205,7 @@ const readCursorComposerSession = (options: {
 
   const composer = JSON.parse(composerRaw) as unknown;
 
-  if (!isRecord(composer) || isPokoCursorImport(composer)) {
+  if (!isRecord(composer)) {
     return undefined;
   }
 
@@ -248,6 +244,10 @@ const readCursorComposerSession = (options: {
     schemaVersion: 1,
     id: `cursor-${options.head.composerId}`,
     sourceAgent: "cursor",
+    ...pokoImportSessionMetadata(
+      cursorPokoImportMetadata(composer) ??
+        cursorPokoImportMetadata(options.head),
+    ),
     title:
       stringValue(options.head.name) ??
       stringValue(composer.name) ??
@@ -440,11 +440,6 @@ const collectTextNodes = (value: unknown, parts: string[]): void => {
 const isCursorComposerHead = (value: unknown): value is CursorComposerHead =>
   isRecord(value) && typeof value.composerId === "string";
 
-const isPokoCursorImport = (value: unknown): boolean =>
-  isRecord(value) &&
-  isRecord(value.pokoImport) &&
-  value.pokoImport.originator === "poko";
-
 const tableExists = (database: Database, tableName: string): boolean =>
   Boolean(
     database
@@ -470,3 +465,43 @@ const numberValue = (value: unknown): number | undefined =>
 
 const stringValue = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim().length > 0 ? value : undefined;
+
+type CursorPokoImportMetadata = {
+  sourceAgent?: string;
+  sourceSessionId?: string;
+  lineageId?: string;
+};
+
+const cursorPokoImportMetadata = (
+  value: unknown,
+): CursorPokoImportMetadata | undefined => {
+  if (
+    !isRecord(value) ||
+    !isRecord(value.pokoImport) ||
+    value.pokoImport.originator !== "poko"
+  ) {
+    return undefined;
+  }
+
+  return {
+    sourceAgent: stringValue(value.pokoImport.sourceAgent),
+    sourceSessionId: stringValue(value.pokoImport.sourceSessionId),
+    lineageId: stringValue(value.pokoImport.lineageId),
+  };
+};
+
+const pokoImportSessionMetadata = (
+  metadata: CursorPokoImportMetadata | undefined,
+): Partial<RawHistorySession> =>
+  metadata
+    ? {
+        importedFromPoko: true,
+        originAgent: metadata.sourceAgent,
+        originSessionId: metadata.sourceSessionId,
+        lineageId:
+          metadata.lineageId ??
+          (metadata.sourceAgent && metadata.sourceSessionId
+            ? `${metadata.sourceAgent}:${metadata.sourceSessionId}`
+            : undefined),
+      }
+    : {};

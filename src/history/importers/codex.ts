@@ -52,7 +52,13 @@ const captureCodexSessions = async (
       continue;
     }
 
-    if (isPokoCodexImport(meta) || isCodexSubagentSession(meta)) {
+    if (isCodexSubagentSession(meta)) {
+      continue;
+    }
+
+    const importMetadata = codexPokoImportMetadata(meta);
+
+    if (isPokoCodexImport(meta) && !importMetadata) {
       continue;
     }
 
@@ -65,6 +71,7 @@ const captureCodexSessions = async (
       schemaVersion: 1,
       id,
       sourceAgent: "codex",
+      ...pokoImportSessionMetadata(importMetadata),
       title: titleById.get(id) ?? titleFrom("Codex session", messages),
       projectRoot: meta.payload.cwd,
       createdAt: meta.payload.timestamp,
@@ -153,6 +160,9 @@ const isCodexMeta = (
     cwd: string;
     originator?: string;
     cli_version?: string;
+    source_agent?: string;
+    source_session_id?: string;
+    lineage_id?: string;
     thread_source?: string;
     source?: unknown;
   };
@@ -164,17 +174,17 @@ const isCodexMeta = (
   typeof event.payload.timestamp === "string" &&
   typeof event.payload.cwd === "string";
 
-const isPokoCodexImport = (event: {
-  payload: { originator?: string; cli_version?: string };
-}): boolean =>
-  event.payload.originator === "poko" ||
-  event.payload.cli_version === "poko-import";
-
 const isCodexSubagentSession = (event: {
   payload: { thread_source?: string; source?: unknown };
 }): boolean =>
   event.payload.thread_source === "subagent" ||
   (isRecord(event.payload.source) && isRecord(event.payload.source.subagent));
+
+const isPokoCodexImport = (event: {
+  payload: { originator?: string; cli_version?: string };
+}): boolean =>
+  event.payload.originator === "poko" ||
+  event.payload.cli_version === "poko-import";
 
 const dedupeAdjacentMessages = (
   messages: RawHistoryMessage[],
@@ -220,6 +230,56 @@ const latestTimestamp = (messages: RawHistoryMessage[]): string | undefined =>
     .filter((timestamp): timestamp is string => Boolean(timestamp))
     .sort()
     .at(-1);
+
+type CodexPokoImportMetadata = {
+  sourceAgent?: string;
+  sourceSessionId?: string;
+  lineageId?: string;
+};
+
+const codexPokoImportMetadata = (event: {
+  payload: {
+    originator?: string;
+    cli_version?: string;
+    source_agent?: string;
+    source_session_id?: string;
+    lineage_id?: string;
+  };
+}): CodexPokoImportMetadata | undefined => {
+  if (
+    event.payload.originator !== "poko" &&
+    event.payload.cli_version !== "poko-import"
+  ) {
+    return undefined;
+  }
+
+  const metadata = {
+    sourceAgent: event.payload.source_agent,
+    sourceSessionId: event.payload.source_session_id,
+    lineageId: event.payload.lineage_id,
+  };
+
+  return metadata.lineageId ||
+    (metadata.sourceAgent && metadata.sourceSessionId)
+    ? metadata
+    : undefined;
+};
+
+const pokoImportSessionMetadata = (
+  metadata: CodexPokoImportMetadata | undefined,
+): Partial<RawHistorySession> =>
+  metadata
+    ? {
+        importedFromPoko: true,
+        originAgent: metadata.sourceAgent,
+        originSessionId: metadata.sourceSessionId,
+        lineageId:
+          metadata.lineageId ??
+          (metadata.sourceAgent && metadata.sourceSessionId
+            ? `${metadata.sourceAgent}:${metadata.sourceSessionId}`
+            : undefined),
+      }
+    : {};
 
 const compact = <T>(values: (T | undefined)[]): T[] =>
   values.filter((value): value is T => value !== undefined);

@@ -2,6 +2,7 @@ import type { AgentId } from "../adapters/types.ts";
 import type { PokoConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import { HISTORY_IMPORTERS } from "./importers/index.ts";
+import { collapseEquivalentSessions } from "./lineage.ts";
 import {
   type NativeHistorySyncResult,
   syncNativeHistoryTargets,
@@ -22,9 +23,8 @@ export const buildProjectHistorySync = async (options: {
   dryRun?: boolean;
   logger?: Pick<Logger, "info" | "warn">;
 }): Promise<ProjectHistorySyncResult> => {
-  const importedSessions = await captureEnabledProjectHistory(
-    options.root,
-    options.config,
+  const importedSessions = collapseEquivalentSessions(
+    await captureEnabledProjectHistory(options.root, options.config),
   );
   const { sessions, skipped } = filterProjectIncarnation(
     importedSessions,

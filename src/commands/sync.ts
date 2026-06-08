@@ -87,6 +87,7 @@ export type SyncReport = {
       displayName: string;
       supported: boolean;
       capturedSessions: number;
+      capturedMessages: number;
       reason?: string;
     }>;
   };

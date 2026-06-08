@@ -247,6 +247,30 @@ describe("history capture", () => {
     ]);
   });
 
+  test("captures Cursor Poko imports with lineage metadata", async () => {
+    await seedCursorPokoImportConversation();
+
+    await runCapture({
+      cwd,
+      agent: "cursor",
+      store: "repo",
+      logger: createMemoryLogger(),
+    });
+
+    const sessions = await loadHistorySessions(cwd, "repo", 1);
+    expect(sessions[0]).toMatchObject({
+      sourceAgent: "cursor",
+      importedFromPoko: true,
+      originAgent: "codex",
+      originSessionId: "codex-source",
+      lineageId: "codex:codex-source",
+    });
+    expect(sessions[0]?.messages.map((message) => message.text)).toEqual([
+      "ask cursor",
+      "answer cursor",
+    ]);
+  });
+
   test("captures Pi JSONL sessions", async () => {
     await seedPiSession();
     await seedPiSession({
@@ -673,6 +697,89 @@ const seedCursorNativeConversation = async (): Promise<void> => {
           bubbleId: assistantBubbleId,
           text: "answer cursor",
           createdAt: "2026-05-29T00:00:02.000Z",
+        }),
+      );
+  } finally {
+    workspaceDatabase.close();
+    globalDatabase.close();
+  }
+};
+
+const seedCursorPokoImportConversation = async (): Promise<void> => {
+  await seedCursorWorkspace();
+  const workspaceDir = path.join(cursorStorage, "workspace-1");
+  const workspaceDatabase = new Database(
+    path.join(workspaceDir, "state.vscdb"),
+  );
+  const globalDatabase = new Database(cursorGlobalStateDbPath);
+  const composerId = "00000000-0000-4000-8000-000000000201";
+  const userBubbleId = "00000000-0000-4000-8000-000000000202";
+  const assistantBubbleId = "00000000-0000-4000-8000-000000000203";
+  const pokoImport = {
+    originator: "poko",
+    sourceAgent: "codex",
+    sourceSessionId: "codex-source",
+    lineageId: "codex:codex-source",
+    projectId: "project-source",
+    projectRoot: cwd,
+  };
+
+  try {
+    workspaceDatabase
+      .query("insert into ItemTable (key, value) values (?, ?)")
+      .run(
+        "composer.composerData",
+        JSON.stringify({
+          allComposers: [
+            {
+              type: "head",
+              composerId,
+              name: "Cursor imported",
+              createdAt: Date.parse("2026-05-29T00:00:00.000Z"),
+              lastUpdatedAt: Date.parse("2026-05-29T00:00:02.000Z"),
+              pokoImport,
+            },
+          ],
+        }),
+      );
+    globalDatabase
+      .query("insert into cursorDiskKV (key, value) values (?, ?)")
+      .run(
+        `composerData:${composerId}`,
+        JSON.stringify({
+          composerId,
+          name: "Cursor imported",
+          createdAt: Date.parse("2026-05-29T00:00:00.000Z"),
+          lastUpdatedAt: Date.parse("2026-05-29T00:00:02.000Z"),
+          pokoImport,
+          fullConversationHeadersOnly: [
+            { bubbleId: userBubbleId, type: 1 },
+            { bubbleId: assistantBubbleId, type: 2 },
+          ],
+        }),
+      );
+    globalDatabase
+      .query("insert into cursorDiskKV (key, value) values (?, ?)")
+      .run(
+        `bubbleId:${composerId}:${userBubbleId}`,
+        JSON.stringify({
+          type: 1,
+          bubbleId: userBubbleId,
+          text: "ask cursor",
+          createdAt: "2026-05-29T00:00:01.000Z",
+          pokoImport,
+        }),
+      );
+    globalDatabase
+      .query("insert into cursorDiskKV (key, value) values (?, ?)")
+      .run(
+        `bubbleId:${composerId}:${assistantBubbleId}`,
+        JSON.stringify({
+          type: 2,
+          bubbleId: assistantBubbleId,
+          text: "answer cursor",
+          createdAt: "2026-05-29T00:00:02.000Z",
+          pokoImport,
         }),
       );
   } finally {

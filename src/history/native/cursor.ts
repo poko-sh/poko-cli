@@ -11,6 +11,7 @@ import {
   resolveCursorGlobalStateDbPath,
   resolveCursorWorkspaceStorageRoot,
 } from "../cursor-storage.ts";
+import { sourceLineageId } from "../lineage.ts";
 import type { RawHistoryMessage, RawHistorySession } from "../types.ts";
 import {
   closeAppForNativeSync,
@@ -93,6 +94,7 @@ export async function syncCursorNativeHistory(
   const globalStateDbPath = resolveCursorGlobalStateDbPath();
   const sessions = nativeTargetSessions(options.sessions, "cursor");
   const messageCount = countConversationMessages(sessions);
+  const sameAgentSessions = countSameAgentSessions(options.sessions, "cursor");
 
   if (options.dryRun) {
     return {
@@ -105,10 +107,24 @@ export async function syncCursorNativeHistory(
       details: {
         composerRecordsWritten: sessions.length,
         bubblesWritten: messageCount,
-        sessionsSkippedFromSameAgent: countSameAgentSessions(
-          options.sessions,
-          "cursor",
-        ),
+        sessionsSkippedFromSameAgent: sameAgentSessions,
+      },
+    };
+  }
+
+  if (sessions.length === 0) {
+    return {
+      target: "cursor",
+      location: globalStateDbPath,
+      sessions: 0,
+      messages: 0,
+      dryRun: false,
+      skipped: false,
+      details: {
+        composerRecordsWritten: 0,
+        bubblesWritten: 0,
+        staleComposersRemoved: 0,
+        sessionsSkippedFromSameAgent: sameAgentSessions,
       },
     };
   }
@@ -190,10 +206,7 @@ export async function syncCursorNativeHistory(
         cursorWasRunning: lifecycle.wasRunning,
         cursorClosed: lifecycle.closed,
         cursorReopened: lifecycle.reopened,
-        sessionsSkippedFromSameAgent: countSameAgentSessions(
-          options.sessions,
-          "cursor",
-        ),
+        sessionsSkippedFromSameAgent: sameAgentSessions,
       },
     };
   } finally {
@@ -232,6 +245,7 @@ const renderCursorSession = (input: {
     originator: "poko",
     sourceAgent: input.session.sourceAgent,
     sourceSessionId: input.session.id,
+    lineageId: sourceLineageId(input.session),
     projectId: input.projectId,
     projectRoot: input.projectRoot,
   };

@@ -1,5 +1,6 @@
 import { readdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
+import { sourceLineageId } from "../lineage.ts";
 import type { RawHistoryMessage, RawHistorySession } from "../types.ts";
 import { nativeMessageAnnotations } from "./annotations.ts";
 import {
@@ -120,6 +121,7 @@ const renderClaudeSession = (
       customTitle: truncate(session.title || "Conversation", 80),
       sessionId,
       timestamp: created.toISOString(),
+      pokoImport: pokoImportMetadata(session, projectRoot),
     },
   ];
   let parentUuid: string | null = null;
@@ -131,6 +133,7 @@ const renderClaudeSession = (
     const timestamp = messageDate(message, created).toISOString();
     rows.push(
       renderClaudeMessage({
+        session,
         sessionId,
         uuid,
         parentUuid,
@@ -177,6 +180,7 @@ const renderClaudeSession = (
 };
 
 const renderClaudeMessage = (input: {
+  session: RawHistorySession;
   sessionId: string;
   uuid: string;
   parentUuid: string | null;
@@ -195,6 +199,7 @@ const renderClaudeMessage = (input: {
     sessionId: input.sessionId,
     version: "poko-import",
     gitBranch: "main",
+    pokoImport: pokoImportMetadata(input.session, input.projectRoot),
   };
 
   if (input.message.role === "user") {
@@ -299,6 +304,7 @@ const renderClaudeToolResult = (input: {
     sessionId: input.sessionId,
     version: "poko-import",
     gitBranch: "main",
+    pokoImport: pokoImportMetadata(input.session, input.projectRoot),
     type: "user",
     message: {
       role: "user",
@@ -314,6 +320,18 @@ const renderClaudeToolResult = (input: {
     sourceToolAssistantUUID: input.assistantUuid,
   };
 };
+
+const pokoImportMetadata = (
+  session: RawHistorySession,
+  projectRoot: string,
+): Record<string, string | undefined> => ({
+  originator: "poko",
+  sourceAgent: session.sourceAgent,
+  sourceSessionId: session.id,
+  lineageId: sourceLineageId(session),
+  projectId: session.projectId,
+  projectRoot,
+});
 
 const claudeToolUseId = (
   assistantUuid: string,

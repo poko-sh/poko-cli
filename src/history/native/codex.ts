@@ -1,4 +1,5 @@
 import path from "node:path";
+import { sourceLineageId } from "../lineage.ts";
 import type { RawHistoryMessage, RawHistorySession } from "../types.ts";
 import { nativeMessageAnnotations } from "./annotations.ts";
 import {
@@ -144,6 +145,10 @@ const renderCodexRollout = (
         cwd: projectRoot,
         originator: "poko",
         cli_version: "poko-import",
+        source_agent: session.sourceAgent,
+        source_session_id: session.id,
+        lineage_id: sourceLineageId(session),
+        project_id: session.projectId,
         source: "cli",
         thread_source: "user",
         model_provider: null,

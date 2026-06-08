@@ -26,6 +26,10 @@ export type RawHistorySession = {
   id: string;
   projectId?: string;
   sourceAgent: HistoryAgent;
+  lineageId?: string;
+  importedFromPoko?: boolean;
+  originAgent?: string;
+  originSessionId?: string;
   title: string;
   projectRoot: string;
   createdAt?: string;

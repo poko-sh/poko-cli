@@ -73,7 +73,11 @@ const captureClaudeFiles = async (
     const rowsBySession = groupClaudeRows(rows, acceptedRootSet);
 
     for (const matchingRows of rowsBySession.values()) {
-      if (matchingRows.some(isPokoClaudeImportRow)) {
+      const importMetadata = matchingRows
+        .map(claudePokoImportMetadata)
+        .find(Boolean);
+
+      if (matchingRows.some(isPokoClaudeImportRow) && !importMetadata) {
         continue;
       }
 
@@ -95,6 +99,7 @@ const captureClaudeFiles = async (
         schemaVersion: 1,
         id: firstRow.sessionId,
         sourceAgent: "claude",
+        ...pokoImportSessionMetadata(importMetadata),
         title: titleFrom("Claude Code session", messages),
         projectRoot: projectRootOverride ?? firstRow.cwd,
         createdAt: firstTimestamp(messages),
@@ -175,9 +180,6 @@ const extractClaudeMessage = (row: unknown): RawHistoryMessage[] => {
   return [];
 };
 
-const isPokoClaudeImportRow = (row: unknown): boolean =>
-  isRecord(row) && row.version === "poko-import";
-
 const encodeClaudeProjectPath = (projectRoot: string): string =>
   projectRoot.normalize("NFC").replace(/[^a-zA-Z0-9]/g, "-");
 
@@ -207,3 +209,54 @@ const latestTimestamp = (messages: RawHistoryMessage[]): string | undefined =>
 
 const compact = <T>(values: (T | undefined)[]): T[] =>
   values.filter((value): value is T => value !== undefined);
+
+type ClaudePokoImportMetadata = {
+  sourceAgent?: string;
+  sourceSessionId?: string;
+  lineageId?: string;
+};
+
+const claudePokoImportMetadata = (
+  row: unknown,
+): ClaudePokoImportMetadata | undefined => {
+  if (!isRecord(row) || row.version !== "poko-import") {
+    return undefined;
+  }
+
+  if (!isRecord(row.pokoImport)) {
+    return undefined;
+  }
+
+  const metadata = {
+    sourceAgent: stringValue(row.pokoImport.sourceAgent),
+    sourceSessionId: stringValue(row.pokoImport.sourceSessionId),
+    lineageId: stringValue(row.pokoImport.lineageId),
+  };
+
+  return metadata.lineageId ||
+    (metadata.sourceAgent && metadata.sourceSessionId)
+    ? metadata
+    : undefined;
+};
+
+const isPokoClaudeImportRow = (row: unknown): boolean =>
+  isRecord(row) && row.version === "poko-import";
+
+const pokoImportSessionMetadata = (
+  metadata: ClaudePokoImportMetadata | undefined,
+): Partial<RawHistorySession> =>
+  metadata
+    ? {
+        importedFromPoko: true,
+        originAgent: metadata.sourceAgent,
+        originSessionId: metadata.sourceSessionId,
+        lineageId:
+          metadata.lineageId ??
+          (metadata.sourceAgent && metadata.sourceSessionId
+            ? `${metadata.sourceAgent}:${metadata.sourceSessionId}`
+            : undefined),
+      }
+    : {};
+
+const stringValue = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim().length > 0 ? value : undefined;

@@ -10,6 +10,7 @@ import {
 } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import { HISTORY_IMPORTERS } from "./importers/index.ts";
+import { collapseEquivalentSessions } from "./lineage.ts";
 import { countConversationMessages } from "./native/common.ts";
 import {
   NATIVE_HISTORY_TARGET_IDS,
@@ -39,6 +40,7 @@ export type GlobalHistorySyncResult = {
     displayName: string;
     supported: boolean;
     capturedSessions: number;
+    capturedMessages: number;
     reason?: string;
   }>;
   nativeTargets: GlobalNativeHistorySyncResult[];
@@ -55,17 +57,19 @@ export const buildGlobalHistorySync = async (options: {
   const baseConfig = options.config ?? createDefaultPokoConfig();
   const warnings: string[] = [];
   const capturedAgents: GlobalHistorySyncResult["capturedAgents"] = [];
-  const sessions = dedupeSessions(
-    (
-      await Promise.all(
-        HISTORY_IMPORTERS.map((importer) =>
-          captureImporterSessions(importer, baseConfig, warnings),
-        ),
-      )
-    ).flatMap((result) => {
-      capturedAgents.push(result.agent);
-      return result.sessions;
-    }),
+  const sessions = collapseEquivalentSessions(
+    dedupeSessions(
+      (
+        await Promise.all(
+          HISTORY_IMPORTERS.map((importer) =>
+            captureImporterSessions(importer, baseConfig, warnings),
+          ),
+        )
+      ).flatMap((result) => {
+        capturedAgents.push(result.agent);
+        return result.sessions;
+      }),
+    ),
   ).sort(compareSessions);
   const sessionsByProject = groupSessionsByProject(sessions);
   const nativeTargets: GlobalNativeHistorySyncResult[] = [];
@@ -131,6 +135,7 @@ const captureImporterSessions = async (
         displayName: importer.displayName,
         supported: Boolean(importer.captureAll),
         capturedSessions: 0,
+        capturedMessages: 0,
         reason: "disabled in history config",
       },
       sessions: [],
@@ -144,6 +149,7 @@ const captureImporterSessions = async (
         displayName: importer.displayName,
         supported: false,
         capturedSessions: 0,
+        capturedMessages: 0,
         reason: "global capture is not implemented for this agent",
       },
       sessions: [],
@@ -160,6 +166,7 @@ const captureImporterSessions = async (
         displayName: importer.displayName,
         supported: true,
         capturedSessions: sessions.length,
+        capturedMessages: countConversationMessages(sessions),
       },
       sessions,
     };
@@ -175,6 +182,7 @@ const captureImporterSessions = async (
         displayName: importer.displayName,
         supported: true,
         capturedSessions: 0,
+        capturedMessages: 0,
         reason,
       },
       sessions: [],
