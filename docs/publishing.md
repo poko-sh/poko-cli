@@ -21,7 +21,7 @@ scoped package:
 
 ```json
 {
-  "name": "@poko-sh/cli",
+  "name": "@poko.sh/cli",
   "bin": {
     "poko": "./dist/cli.js"
   }
@@ -35,10 +35,10 @@ Users still run `poko`; only the package install name is scoped.
 Primary install commands:
 
 ```sh
-bunx @poko-sh/cli init
-npx @poko-sh/cli init
-npm install -g @poko-sh/cli
-bun add -g @poko-sh/cli
+bunx @poko.sh/cli init
+npx @poko.sh/cli init
+npm install -g @poko.sh/cli
+bun add -g @poko.sh/cli
 ```
 
 Later Homebrew install:
@@ -55,10 +55,10 @@ rebuild the TypeScript package locally.
 
 One-time setup:
 
-1. Create the `poko-sh` npm organization.
+1. Create the `@poko.sh` npm organization.
 2. Add publish access for maintainers.
 3. Add `NPM_TOKEN` to GitHub Actions secrets.
-4. Rename `package.json` from `poko` to `@poko-sh/cli` before first publish.
+4. Rename `package.json` from `poko` to `@poko.sh/cli` before first publish.
 5. Keep the executable name in `bin` as `poko`.
 
 Per release:

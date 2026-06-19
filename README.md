@@ -13,10 +13,10 @@ It can also import project chat history into native agent stores. That does **no
 Install from npm (requires [Bun](https://bun.sh) >= 1.2):
 
 ```sh
-bunx @poko-sh/cli init
+bunx @poko.sh/cli init
 # add .poko/rules.md, .poko/mcp.json, or other source context when you need it
-bunx @poko-sh/cli status
-bunx @poko-sh/cli sync --all
+bunx @poko.sh/cli status
+bunx @poko.sh/cli sync --all
 ```
 
 Contributors running from source:
@@ -35,13 +35,13 @@ so you can keep sending messages in the native chat.
 
 ```sh
 # 1. Initialize Poko in your project
-bunx @poko-sh/cli init
+bunx @poko.sh/cli init
 
 # 2. Preview what would sync (no writes)
-bunx @poko-sh/cli sync --targets claude --dry-run --json
+bunx @poko.sh/cli sync --targets claude --dry-run --json
 
 # 3. Sync static context + Codex chat history into Claude Code
-bunx @poko-sh/cli sync --targets claude
+bunx @poko.sh/cli sync --targets claude
 
 # 4. Open Claude Code in this project — imported threads should appear
 #    in ~/.claude/projects/<your-project>/

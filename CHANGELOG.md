@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@poko-sh/cli` are documented here. The format is based on
+All notable changes to `@poko.sh/cli` are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
@@ -16,7 +16,7 @@ All notable changes to `@poko-sh/cli` are documented here. The format is based o
 
 ### Changed
 
-- Package renamed to `@poko-sh/cli` (executable name remains `poko`)
+- Package renamed to `@poko.sh/cli` (executable name remains `poko`)
 - npm `files` field ships `dist/cli.js` only, not compiled sidecars
 
 ## [0.1.0] - 2026-05-28
