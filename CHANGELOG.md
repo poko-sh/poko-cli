@@ -5,6 +5,15 @@ All notable changes to `@poko.sh/cli` are documented here. The format is based o
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-19
+
+### Changed
+
+- Release workflow uses npm Trusted Publishing (OIDC) instead of long-lived tokens
+- npm package ships only user-facing docs (`protocol.md`, `native-chat-sync.md`)
+
+## [0.1.0] - 2026-05-28
+
 ### Added
 
 - GitHub Actions CI (test, typecheck, lint, build, npm pack guard)
@@ -24,8 +33,6 @@ All notable changes to `@poko.sh/cli` are documented here. The format is based o
 - Package renamed to `@poko.sh/cli` (executable name remains `poko`)
 - npm `files` field ships `dist/cli.js` only, not compiled sidecars
 
-## [0.1.0] - 2026-05-28
-
 ### Added
 
 - `poko init`, `sync`, `export`, `capture`, `history`, `doctor`, `handoff`
@@ -34,5 +41,6 @@ All notable changes to `@poko.sh/cli` are documented here. The format is based o
 - History compatibility reporting and portable handoffs
 - Reversible lab harness for adapter validation
 
-[Unreleased]: https://github.com/poko-sh/poko-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/poko-sh/poko-cli/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/poko-sh/poko-cli/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/poko-sh/poko-cli/releases/tag/v0.1.0
