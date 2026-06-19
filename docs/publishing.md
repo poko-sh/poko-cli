@@ -53,12 +53,23 @@ rebuild the TypeScript package locally.
 
 ## npm Release Checklist
 
-One-time setup:
+### One-time setup (Trusted Publishing)
+
+Use [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) instead
+of a long-lived `NPM_TOKEN`. This avoids 2FA OTP failures in CI and is npm's
+recommended path for GitHub Actions.
 
 1. Create the `@poko.sh` npm organization.
 2. Add publish access for maintainers.
-3. Add `NPM_TOKEN` to GitHub Actions secrets.
-4. Rename `package.json` from `poko` to `@poko.sh/cli` before first publish.
+3. On npmjs.com, open the `@poko.sh/cli` package settings (or org publishing
+   settings for a new package) and add a **Trusted Publisher**:
+   - Provider: **GitHub Actions**
+   - Organization or user: `poko-sh`
+   - Repository: `poko-cli`
+   - Workflow filename: `release.yml` (exact match, including `.yml`)
+   - Environment: leave empty unless you add a GitHub environment later
+4. Do **not** store `NPM_TOKEN` in GitHub secrets for releases. The workflow
+   uses OIDC via `permissions: id-token: write`.
 5. Keep the executable name in `bin` as `poko`.
 
 Per release:
@@ -80,9 +91,9 @@ git tag v0.1.1
 git push origin v0.1.1
 ```
 
-GitHub Actions should run the checks, build `dist`, publish the npm package, and
-attach compiled binaries to GitHub Releases for the desktop app and future
-Homebrew formula.
+GitHub Actions runs the checks, builds `dist`, publishes via trusted publishing,
+and attaches release notes on tag push. The release workflow requires npm CLI
+v11.5.1+ and upgrades npm automatically before `npm publish`.
 
 ## Versioning
 

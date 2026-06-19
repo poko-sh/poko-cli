@@ -45,6 +45,18 @@
     "codex"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/poko-sh/poko-cli.git"
+  },
+  "homepage": "https://github.com/poko-sh/poko-cli#readme",
+  "bugs": {
+    "url": "https://github.com/poko-sh/poko-cli/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "picocolors": "^1.1.1",
