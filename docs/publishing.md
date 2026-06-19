@@ -84,6 +84,13 @@ npm pack --dry-run
 npm publish --access public
 ```
 
+**First publish only:** run `npm publish` locally after `npm login`. Do not set
+`publishConfig.provenance` — provenance is generated automatically on later CI
+publishes via Trusted Publishing, not from a laptop.
+
+**Later releases:** push a `v*` tag and let `.github/workflows/release.yml`
+publish via OIDC.
+
 Recommended release command once automated:
 
 ```sh

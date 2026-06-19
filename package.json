@@ -4,7 +4,7 @@
   "description": "Your pocket context buddy for AI coding agents.",
   "type": "module",
   "bin": {
-    "poko": "./dist/cli.js"
+    "poko": "dist/cli.js"
   },
   "files": [
     "dist/cli.js",
@@ -54,8 +54,7 @@
     "url": "https://github.com/poko-sh/poko-cli/issues"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
