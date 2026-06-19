@@ -57,15 +57,15 @@ const captureCursorWorkspaces = async (
         continue;
       }
 
-      const nativeSessions = await readCursorNativeSessions({
+      const nativeResult = await readCursorNativeSessions({
         projectRoot,
         workspaceId: workspace.id,
         workspaceDatabasePath: workspace.databasePath,
         globalStateDbPath,
       });
 
-      if (nativeSessions.length > 0) {
-        sessions.push(...nativeSessions);
+      if (nativeResult.usesGlobalNativeComposerStore) {
+        sessions.push(...nativeResult.sessions);
         continue;
       }
 
@@ -98,7 +98,10 @@ const readCursorNativeSessions = async (options: {
   workspaceId: string;
   workspaceDatabasePath: string;
   globalStateDbPath: string;
-}): Promise<RawHistorySession[]> => {
+}): Promise<{
+  sessions: RawHistorySession[];
+  usesGlobalNativeComposerStore: boolean;
+}> => {
   let globalDatabase: Database;
 
   try {
@@ -106,7 +109,7 @@ const readCursorNativeSessions = async (options: {
       readonly: true,
     });
   } catch {
-    return [];
+    return { sessions: [], usesGlobalNativeComposerStore: false };
   }
 
   let workspaceDatabase: Database;
@@ -117,12 +120,12 @@ const readCursorNativeSessions = async (options: {
     });
   } catch {
     globalDatabase.close();
-    return [];
+    return { sessions: [], usesGlobalNativeComposerStore: false };
   }
 
   try {
     if (!tableExists(globalDatabase, "cursorDiskKV")) {
-      return [];
+      return { sessions: [], usesGlobalNativeComposerStore: false };
     }
 
     const heads = collectCursorComposerHeads({
@@ -130,9 +133,34 @@ const readCursorNativeSessions = async (options: {
       workspaceDatabase,
       workspaceId: options.workspaceId,
     });
+    const globalHeads = readHeadsFromItemTable(
+      globalDatabase,
+      "composer.composerHeaders",
+    ).filter((head) => head.workspaceIdentifier?.id === options.workspaceId);
+    const usesGlobalNativeComposerStore =
+      globalHeads.length > 0 ||
+      heads.some(
+        (head) =>
+          queryCursorDiskValue(
+            globalDatabase,
+            `composerData:${head.composerId}`,
+          ) !== undefined,
+      );
     const sessions: RawHistorySession[] = [];
 
     for (const head of heads) {
+      const composerRaw = queryCursorDiskValue(
+        globalDatabase,
+        `composerData:${head.composerId}`,
+      );
+      const composer = composerRaw
+        ? (JSON.parse(composerRaw) as unknown)
+        : undefined;
+
+      if (isCursorPokoTaggedImport(head, composer)) {
+        continue;
+      }
+
       const session = readCursorComposerSession({
         database: globalDatabase,
         head,
@@ -145,7 +173,7 @@ const readCursorNativeSessions = async (options: {
       }
     }
 
-    return sessions;
+    return { sessions, usesGlobalNativeComposerStore };
   } finally {
     workspaceDatabase.close();
     globalDatabase.close();
@@ -507,6 +535,13 @@ const cursorPokoImportMetadata = (
     lineageId: stringValue(value.pokoImport.lineageId),
   };
 };
+
+const isCursorPokoTaggedImport = (
+  head: CursorComposerHead,
+  composer: unknown,
+): boolean =>
+  cursorPokoImportMetadata(composer) !== undefined ||
+  cursorPokoImportMetadata(head) !== undefined;
 
 const pokoImportSessionMetadata = (
   metadata: CursorPokoImportMetadata | undefined,

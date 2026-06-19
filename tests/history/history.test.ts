@@ -268,28 +268,19 @@ describe("history capture", () => {
     ]);
   });
 
-  test("captures Cursor Poko imports with lineage metadata", async () => {
+  test("skips Cursor Poko imports during capture", async () => {
     await seedCursorPokoImportConversation();
 
-    await runCapture({
+    const logger = createMemoryLogger();
+    const captured = await runCapture({
       cwd,
       agent: "cursor",
       store: "repo",
-      logger: createMemoryLogger(),
+      logger,
     });
 
-    const sessions = await loadHistorySessions(cwd, "repo", 1);
-    expect(sessions[0]).toMatchObject({
-      sourceAgent: "cursor",
-      importedFromPoko: true,
-      originAgent: "codex",
-      originSessionId: "codex-source",
-      lineageId: "codex:codex-source",
-    });
-    expect(sessions[0]?.messages.map((message) => message.text)).toEqual([
-      "ask cursor",
-      "answer cursor",
-    ]);
+    expect(captured).toBe(0);
+    expect(logger.messages.join("\n")).toContain("no matching history found");
   });
 
   test("captures Pi JSONL sessions", async () => {

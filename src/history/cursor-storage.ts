@@ -1,6 +1,12 @@
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -44,11 +50,22 @@ export const findCursorWorkspaces = async (
   storageRoot: string,
   projectRoot: string,
 ): Promise<CursorWorkspace[]> => {
+  const canonicalProjectRoot = await canonicalPath(projectRoot);
   const workspaces = await listCursorWorkspaces(storageRoot);
-  return workspaces.filter(
-    (workspace) =>
-      normalizeCursorWorkspacePath(workspace.folderUri) === projectRoot,
-  );
+  const matched: CursorWorkspace[] = [];
+
+  for (const workspace of workspaces) {
+    const normalized = normalizeCursorWorkspacePath(workspace.folderUri);
+
+    if (
+      normalized &&
+      (await canonicalPath(normalized)) === canonicalProjectRoot
+    ) {
+      matched.push(workspace);
+    }
+  }
+
+  return matched;
 };
 
 export const listCursorWorkspaces = async (
@@ -185,3 +202,11 @@ const createCursorWorkspaceId = (projectRoot: string): string =>
     .update(`poko:cursor:workspace:${projectRoot}`)
     .digest("hex")
     .slice(0, 32);
+
+const canonicalPath = async (value: string): Promise<string> => {
+  try {
+    return (await realpath(value)).normalize("NFC");
+  } catch {
+    return path.resolve(value).normalize("NFC");
+  }
+};

@@ -14,6 +14,11 @@ All notable changes to `@poko.sh/cli` are documented here. The format is based o
 - Lab gate for storage-level native sync parity checks
 - CONTRIBUTING, SECURITY, and issue templates
 
+### Fixed
+
+- Cursor capture skips Poko-tagged native imports to avoid echo loops on Linux CI
+- Workspace path matching uses canonical paths for cross-platform reliability
+
 ### Changed
 
 - Package renamed to `@poko.sh/cli` (executable name remains `poko`)
