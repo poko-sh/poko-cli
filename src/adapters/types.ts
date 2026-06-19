@@ -3,8 +3,6 @@ import type { PokoConfig, PokoContext } from "../core/config.ts";
 export const AGENT_IDS = [
   "claude",
   "cursor",
-  "antigravity",
-  "copilot",
   "t3code",
   "opencode",
   "pi",
@@ -16,10 +14,6 @@ export const AGENT_IDS = [
 export type AgentId = (typeof AGENT_IDS)[number];
 
 const AGENT_ALIASES: Record<string, AgentId> = {
-  ag: "antigravity",
-  agy: "antigravity",
-  google: "antigravity",
-  "github-copilot": "copilot",
   oc: "opencode",
   claw: "openclaw",
   clawdbot: "openclaw",
@@ -29,7 +23,6 @@ const AGENT_ALIASES: Record<string, AgentId> = {
   "pi-coding-agent": "pi",
   t3: "t3code",
   "t3-code": "t3code",
-  vscode: "copilot",
 };
 
 export const resolveAgentId = (value: string): AgentId | undefined => {

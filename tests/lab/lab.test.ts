@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { runGate } from "../../lab/gate.ts";
 import {
   buildLabEnv,
   createLabPaths,
@@ -152,6 +153,39 @@ describe("poko lab", () => {
         ),
       ) as { history?: { defaultStore?: string } };
       expect(config.history?.defaultStore).toBe("repo");
+    } finally {
+      await removeTempDir(tempDir);
+    }
+  });
+
+  test("gate runs paid-launch storage parity checks", async () => {
+    const tempDir = await makeTempDir();
+
+    try {
+      const labRoot = path.join(tempDir, "lab");
+      const repoRoot = process.cwd();
+
+      const result = await runGate({ repoRoot, root: labRoot });
+      const paths = createLabPaths({ root: labRoot });
+      const report = await readFile(
+        path.join(paths.reportDir, "index.html"),
+        "utf8",
+      );
+      const gateJson = await readFile(
+        path.join(paths.reportDir, "gate-results.json"),
+        "utf8",
+      );
+
+      expect(result.passed).toBe(true);
+      expect(result.checks.some((check) => check.status === "manual")).toBe(
+        true,
+      );
+      expect(result.checks.filter((check) => check.status === "fail")).toEqual(
+        [],
+      );
+      expect(report).toContain("Launch Gate");
+      expect(report).toContain("Ready for paid-launch review");
+      expect(gateJson).toContain("real app visual confirmation");
     } finally {
       await removeTempDir(tempDir);
     }

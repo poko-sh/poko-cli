@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { antigravityAdapter } from "../../src/adapters/antigravity.ts";
 import { claudeAdapter } from "../../src/adapters/claude.ts";
 import { codexAdapter } from "../../src/adapters/codex.ts";
-import { copilotAdapter } from "../../src/adapters/copilot.ts";
 import { cursorAdapter } from "../../src/adapters/cursor.ts";
 import { hermesAdapter } from "../../src/adapters/hermes.ts";
 import { openClawAdapter } from "../../src/adapters/openclaw.ts";
@@ -82,46 +80,6 @@ describe("agent adapters", () => {
     expect(operations.map((operation) => operation.path)).toContain(
       ".cursor/mcp.json",
     );
-  });
-
-  test("renders Antigravity GEMINI.md and workspace rule", async () => {
-    const context = await loadPokoContext(cwd);
-    const operations = antigravityAdapter.render(context, {
-      config: context.config,
-    });
-    const rule = operations.find(
-      (operation) => operation.path === ".agents/rules/poko.md",
-    );
-
-    expect(operations.map((operation) => operation.path)).toContain(
-      "GEMINI.md",
-    );
-    expect(rule && "content" in rule ? rule.content : "").toContain(
-      "alwaysApply: true",
-    );
-  });
-
-  test("renders GitHub Copilot instructions and VS Code MCP", async () => {
-    const context = await loadPokoContext(cwd);
-    const operations = copilotAdapter.render(context, {
-      config: context.config,
-    });
-    const mcp = operations.find(
-      (operation) => operation.path === ".vscode/mcp.json",
-    );
-
-    expect(operations.map((operation) => operation.path)).toContain(
-      ".github/copilot-instructions.md",
-    );
-    expect(mcp?.type).toBe("json-merge");
-    expect(mcp && "merge" in mcp ? mcp.merge : {}).toEqual({
-      servers: {
-        docs: {
-          type: "http",
-          url: "https://example.com/mcp",
-        },
-      },
-    });
   });
 
   test("renders T3 Code AGENTS.md and skills", async () => {

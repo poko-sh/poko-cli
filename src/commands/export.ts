@@ -1,12 +1,10 @@
 import { getAdapter } from "../adapters/index.ts";
-import {
-  type AgentId,
-  type FileOperation,
-  type JsonObject,
-  type JsonValue,
-  resolveAgentId,
-  supportedAgentList,
+import type {
+  FileOperation,
+  JsonObject,
+  JsonValue,
 } from "../adapters/types.ts";
+import { parseAgentId } from "../core/agent-parse.ts";
 import { loadPokoContext } from "../core/config.ts";
 import { stringifyJson } from "../core/json.ts";
 import type { Logger } from "../core/logger.ts";
@@ -143,15 +141,3 @@ const unionStringArrayAtPath = (
 
 const isJsonObject = (value: JsonValue | unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-const parseAgentId = (value: string): AgentId => {
-  const agent = resolveAgentId(value);
-
-  if (agent) {
-    return agent;
-  }
-
-  throw new Error(
-    `Unknown agent "${value}". Supported agents: ${supportedAgentList()}.`,
-  );
-};

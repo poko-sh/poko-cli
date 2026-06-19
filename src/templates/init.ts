@@ -15,13 +15,6 @@ export const DEFAULT_POKO_CONFIG = `{
       "mcp": true,
       "legacyCursorrules": false
     },
-    "antigravity": {
-      "enabled": true
-    },
-    "copilot": {
-      "enabled": true,
-      "mcp": true
-    },
     "t3code": {
       "enabled": true,
       "skills": true

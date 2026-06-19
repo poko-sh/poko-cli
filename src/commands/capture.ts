@@ -1,3 +1,4 @@
+import { filterProjectIncarnation, parseStore } from "../core/agent-parse.ts";
 import { loadPokoConfig, type PokoConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import {
@@ -74,11 +75,11 @@ export const runCaptureReport = async (
       options.logger.info(`checking ${importer.displayName} history...`);
     }
 
-    const importedSessions = await importer.capture(options.cwd);
+    const importedSessions = await captureImporterSessions(importer, options);
     const { sessions, skipped } = filterProjectIncarnation(
       importedSessions,
       config,
-      Boolean(options.includePrevious),
+      { includePrevious: Boolean(options.includePrevious) },
     );
     const stampedSessions = stampProjectIdentity(sessions, config);
     detectedSessions.push(...stampedSessions);
@@ -148,6 +149,26 @@ export const runCaptureReport = async (
   };
 };
 
+const captureImporterSessions = async (
+  importer: (typeof HISTORY_IMPORTERS)[number],
+  options: CaptureOptions,
+): Promise<RawHistorySession[]> => {
+  try {
+    return await importer.capture(options.cwd);
+  } catch (error) {
+    if (!options.quiet) {
+      options.logger.warn(
+        `could not read ${importer.displayName} history: ${errorMessage(error)}`,
+      );
+    }
+
+    return [];
+  }
+};
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 const toCaptureEntry = (
   session: RawHistorySession,
 ): CaptureReport["entries"][number] => ({
@@ -170,38 +191,6 @@ const stampProjectIdentity = (
     ...session,
     projectId: config.project.id || session.projectId,
   }));
-
-const filterProjectIncarnation = (
-  sessions: RawHistorySession[],
-  config: PokoConfig,
-  includePrevious: boolean,
-): { sessions: RawHistorySession[]; skipped: RawHistorySession[] } => {
-  if (includePrevious || config.history.includePreviousProjectIncarnations) {
-    return { sessions, skipped: [] };
-  }
-
-  const projectCreatedAt = Date.parse(config.project.createdAt);
-
-  if (!Number.isFinite(projectCreatedAt)) {
-    return { sessions, skipped: [] };
-  }
-
-  const current: RawHistorySession[] = [];
-  const skipped: RawHistorySession[] = [];
-
-  for (const session of sessions) {
-    const timestamp = Date.parse(session.updatedAt ?? session.createdAt ?? "");
-
-    if (Number.isFinite(timestamp) && timestamp < projectCreatedAt) {
-      skipped.push(session);
-      continue;
-    }
-
-    current.push(session);
-  }
-
-  return { sessions: current, skipped };
-};
 
 const reportSessions = (
   sessions: RawHistorySession[],
@@ -285,12 +274,4 @@ const parseHistoryAgent = (value: string): HistoryAgent => {
   throw new Error(
     `Unknown history agent "${value}". Supported history agents: ${supportedHistoryAgents()}.`,
   );
-};
-
-const parseStore = (value: string): HistoryStore => {
-  if (value === "local" || value === "repo" || value === "both") {
-    return value;
-  }
-
-  throw new Error('History store must be one of "local", "repo", or "both".');
 };

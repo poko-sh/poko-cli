@@ -3,6 +3,7 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { runDoctor } from "../../src/commands/doctor.ts";
 import { runInit } from "../../src/commands/init.ts";
+import { runStatus } from "../../src/commands/status.ts";
 import { createMemoryLogger, makeTempDir, removeTempDir } from "../helpers.ts";
 
 let cwd: string;
@@ -79,6 +80,8 @@ describe("poko doctor", () => {
     expect(output).toContain("Native Sync Dry Run");
     expect(output).toContain("claude: would sync 1 session(s), 2 message(s)");
     expect(output).toContain("sessionsSkippedFromSameAgent=0");
+    expect(output).toContain("History Compatibility");
+    expect(output).toContain("Codex ↔ Claude Code");
     expect(output).toContain("Warnings");
   });
 
@@ -96,20 +99,20 @@ describe("poko doctor", () => {
 });
 
 describe("poko status", () => {
-  test("reports a compact project readiness summary", async () => {
+  test("reports a compact project readiness summary from the history index", async () => {
     await configureRepoHistoryStore();
     await seedCodexSession();
     const logger = createMemoryLogger();
 
-    await runDoctor({ cwd, logger, compact: true });
+    await runStatus({ cwd, logger });
 
     const output = logger.messages.join("\n");
     expect(output).toContain("poko status");
     expect(output).toContain("source context:");
     expect(output).toContain("adapters:");
-    expect(output).toContain("history: 1 current session");
-    expect(output).toContain("native sync:");
+    expect(output).toContain("history index:");
     expect(output).not.toContain("Native Sync Dry Run");
+    expect(output).not.toContain("native sync:");
   });
 });
 

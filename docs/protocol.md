@@ -17,7 +17,9 @@ copy.
 
 ### `poko status --json`
 
-Compact project readiness report for dashboards and menu bar status.
+Compact project readiness report for dashboards and menu bar status. Uses the
+stored history index only; it does not capture live agent history or run native
+dry-run writes.
 
 ```json
 {
@@ -43,14 +45,14 @@ Compact project readiness report for dashboards and menu bar status.
   },
   "adapters": [],
   "history": {
-    "currentSessions": 2,
-    "skippedOlderSessions": 1,
-    "importers": []
-  },
-  "nativeSync": {
-    "readyTargets": 8,
-    "skippedTargets": 0,
-    "targets": []
+    "indexedSessions": 2,
+    "importers": [
+      {
+        "id": "codex",
+        "enabled": true,
+        "indexedSessions": 2
+      }
+    ]
   },
   "warnings": []
 }
@@ -70,8 +72,68 @@ If a project has not been initialized, the command returns:
 
 ### `poko doctor --json`
 
-Same shape as `status`, with `command: "doctor"`. The desktop app can use this
-when it wants the full adapter/native dry-run data.
+Full readiness report with live history capture and native sync dry-run targets.
+Same adapter/source-context fields as `status`, plus:
+
+- `history.currentSessions` and `history.skippedOlderSessions` from live capture
+- `nativeSync.readyTargets`, `nativeSync.skippedTargets`, and `nativeSync.targets`
+- `historyCompatibility`
+- route-specific warnings from `collectHistorySyncWarnings`
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "doctor",
+  "generatedAt": "2026-05-30T00:00:00.000Z",
+  "project": {},
+  "sourceContext": {},
+  "adapters": [],
+  "history": {
+    "currentSessions": 2,
+    "skippedOlderSessions": 1,
+    "importers": []
+  },
+  "nativeSync": {
+    "readyTargets": 2,
+    "skippedTargets": 0,
+    "targets": []
+  },
+  "historyCompatibility": {
+    "summary": "Poko syncs project context everywhere it supports...",
+    "primaryRoutes": [
+      "Codex ↔ Claude Code — full native chat import and resume"
+    ],
+    "agents": []
+  },
+  "warnings": []
+}
+```
+
+### `poko agents wait-ready --json`
+
+Polls or waits until selected native-history agents are safe to write (app
+closed and database unlocked).
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "agents wait-ready",
+  "generatedAt": "2026-05-30T00:00:00.000Z",
+  "root": "/path/to/project",
+  "timeoutMs": 30000,
+  "ready": true,
+  "agents": [
+    {
+      "id": "cursor",
+      "ready": true
+    }
+  ]
+}
+```
+
+When `--agents` is empty or omitted, `ready` is `false` and `agents` is `[]`.
+
+Use `--probe` for a single readiness check without waiting.
 
 ### `poko sync --json`
 
@@ -97,14 +159,32 @@ Runs sync and returns file and history outcomes.
     "enabled": true,
     "sessions": [],
     "skippedOlderSessions": 0,
-    "nativeTargets": []
+    "nativeTargets": [],
+    "appCloseAgents": ["cursor"]
   },
-  "warnings": []
+  "historyCompatibility": {
+    "summary": "Poko syncs project context everywhere it supports...",
+    "primaryRoutes": [],
+    "agents": []
+  },
+  "warnings": [
+    "Cursor native chat sync imports cross-agent history for reading only..."
+  ]
 }
 ```
 
+`history.appCloseAgents` lists native targets that went through app-close
+orchestration during sync and require `requiresAppClose` in the capability
+table. Before approving a write, the desktop app should call
+`poko agents wait-ready --agents cursor,t3code --json` to confirm databases
+are readable.
+
 Use `--dry-run --json` for app previews. Use `--backup --json` when the app is
 executing a user-approved write.
+
+When Cursor is selected as a native history target, the desktop app should show
+`historyCompatibility` and any Cursor-specific `warnings` before the user
+approves sync. Do not present Cursor cross-agent imports as resumable chats.
 
 The desktop app can pass `--targets claude,cursor,t3code` instead of `--all`
 when the user selects explicit destinations.
@@ -131,7 +211,7 @@ default local history settings for that project.
       {
         "id": "session-id",
         "sourceAgent": "codex",
-        "title": "Same conversation everywhere",
+        "title": "Build auth middleware",
         "projectRoot": "/path/to/project",
         "messages": 42
       }
@@ -199,7 +279,8 @@ Captures project history and reports per-importer counts.
 
 Restores raw Poko sessions from a local JSON payload and imports them into
 selected native history targets. The file can contain either `{ "session": {} }`
-or `{ "sessions": [] }`.
+or `{ "sessions": [] }`. Restore requires explicit native targets via
+`--targets` or `--all`.
 
 ```json
 {
@@ -216,7 +297,7 @@ or `{ "sessions": [] }`.
       {
         "id": "session-id",
         "sourceAgent": "codex",
-        "title": "Same conversation everywhere",
+        "title": "Build auth middleware",
         "projectRoot": "/path/to/project",
         "messages": 42
       }
@@ -232,6 +313,11 @@ or `{ "sessions": [] }`.
         "skipped": false
       }
     ]
+  },
+  "historyCompatibility": {
+    "summary": "Poko syncs project context everywhere it supports...",
+    "primaryRoutes": [],
+    "agents": []
   },
   "warnings": []
 }
@@ -250,7 +336,7 @@ Returns the captured history index for the active project.
     {
       "id": "session-id",
       "sourceAgent": "codex",
-      "title": "Same conversation everywhere",
+      "title": "Build auth middleware",
       "projectRoot": "/path/to/project",
       "updatedAt": "2026-05-30T00:00:00.000Z",
       "messageCount": 42,
@@ -267,6 +353,7 @@ directory when operating on a selected project. The initial app MVP only needs:
 
 - `status --json` for project cards and menu bar health
 - `history --json` for the latest conversation list
+- `agents wait-ready --agents cursor,t3code --json` before SQLite writes
 - `sync --dry-run --json` for preview
 - `sync --backup --json` for user-approved writes
 - `sync --global --targets <list> --dry-run --json` for all-project previews

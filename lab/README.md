@@ -60,6 +60,18 @@ Run the smoke check in write mode to prove target stores are actually mutated:
 bun lab/poko-lab.ts smoke --write
 ```
 
+Run the paid-launch synthetic gate:
+
+```sh
+bun run lab:gate
+```
+
+The gate resets the isolated run, seeds feature-rich source chats, previews a
+full sync, writes into every native target, recaptures with another dry-run, and
+fails if storage parity, lineage collapse, or duplicate-import checks regress.
+Manual real-app visual checks are listed separately in the report because they
+require opening the actual app/CLI.
+
 The report is written to:
 
 ```sh

@@ -1,0 +1,64 @@
+name: Bug report
+description: Something broke or behaved unexpectedly
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Commands you ran, in order. Include flags like `--dry-run` if relevant.
+      placeholder: |
+        poko doctor
+        poko sync --targets claude --dry-run
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Poko version
+      placeholder: "0.1.0 or commit SHA"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: agents
+    attributes:
+      label: Affected agents
+      options:
+        - label: claude
+        - label: cursor
+        - label: codex
+        - label: t3code
+        - label: opencode
+        - label: pi
+        - label: hermes
+        - label: openclaw
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Paste `poko doctor --json` or error output. Redact paths or emails if needed.
+      render: shell

@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { ADAPTERS } from "../adapters/index.ts";
+import type { AgentId } from "../adapters/types.ts";
 import {
-  type AgentId,
-  resolveAgentId,
-  supportedAgentList,
-} from "../adapters/types.ts";
+  parseAgentId,
+  parseAgentList,
+  parseStore,
+} from "../core/agent-parse.ts";
 import { loadPokoContext } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import {
@@ -13,9 +14,12 @@ import {
 } from "../history/native/index.ts";
 import { writeHistorySessions } from "../history/storage.ts";
 import {
+  buildHistoryCompatibilityReport,
+  collectHistorySyncWarnings,
+} from "../history/sync-capabilities.ts";
+import {
   type HistoryAgent,
   type HistoryRole,
-  type HistoryStore,
   type RawHistoryMessage,
   type RawHistorySession,
   resolveHistoryAgent,
@@ -62,6 +66,22 @@ export const runRestoreReport = async (
     context.config.project.id,
   );
   const targetAgents = selectTargetAgents(options, context.config.adapters);
+
+  if (sessions.length > 0 && targetAgents.length === 0) {
+    throw new Error(
+      "Restore requires native targets. Pass --targets claude,codex or --all to import sessions into agent history.",
+    );
+  }
+
+  if (!options.dryRun && sessions.length > 0) {
+    await writeHistorySessions(
+      context.root,
+      store,
+      sessions,
+      context.config.project.id,
+    );
+  }
+
   const nativeTargets =
     sessions.length > 0 && targetAgents.length > 0
       ? await syncNativeHistoryTargets({
@@ -74,14 +94,10 @@ export const runRestoreReport = async (
         })
       : [];
 
-  if (!options.dryRun && sessions.length > 0) {
-    await writeHistorySessions(
-      context.root,
-      store,
-      sessions,
-      context.config.project.id,
-    );
-  }
+  const historyWarnings = collectHistorySyncWarnings({
+    targetAgents,
+    sessions,
+  });
 
   if (!options.quiet) {
     options.logger.info(
@@ -91,6 +107,9 @@ export const runRestoreReport = async (
       options.logger.info(
         `${options.dryRun ? "would sync" : "synced"} ${target.sessions} session(s), ${target.messages} message(s) into ${target.target}.`,
       );
+    }
+    for (const warning of historyWarnings) {
+      options.logger.warn(warning);
     }
   }
 
@@ -119,7 +138,8 @@ export const runRestoreReport = async (
       skippedOlderSessions: 0,
       nativeTargets: nativeTargets.map((target) => ({ ...target })),
     },
-    warnings: context.warnings,
+    historyCompatibility: buildHistoryCompatibilityReport(),
+    warnings: [...context.warnings, ...historyWarnings],
   };
 };
 
@@ -222,38 +242,8 @@ const selectTargetAgents = (
   return [];
 };
 
-const parseAgentId = (value: string): AgentId => {
-  const agent = resolveAgentId(value);
-
-  if (agent) {
-    return agent;
-  }
-
-  throw new Error(
-    `Unknown agent "${value}". Supported agents: ${supportedAgentList()}.`,
-  );
-};
-
-const parseAgentList = (value: string): AgentId[] => {
-  const agents = value
-    .split(",")
-    .map((agent) => agent.trim())
-    .filter(Boolean)
-    .map(parseAgentId);
-
-  return [...new Set(agents)];
-};
-
 const isNativeHistoryTarget = (agent: AgentId): boolean =>
   (NATIVE_HISTORY_TARGET_IDS as AgentId[]).includes(agent);
-
-const parseStore = (value: string): HistoryStore => {
-  if (value === "local" || value === "repo" || value === "both") {
-    return value;
-  }
-
-  throw new Error('History store must be one of "local", "repo", or "both".');
-};
 
 const requireString = (value: unknown, label: string): string => {
   if (typeof value === "string" && value.length > 0) {

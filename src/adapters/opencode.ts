@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import { hasProjectContext, renderFullContext } from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import { hasMcpServers, renderOpenCodeConfigJson } from "./common.ts";
@@ -7,11 +9,27 @@ export const openCodeAdapter: AgentAdapter = {
   id: "opencode",
   displayName: "OpenCode",
   detect(root) {
+    const home = os.homedir();
+
     return detectBySignals(root, {
       id: "opencode",
       displayName: "OpenCode",
       binaries: ["opencode"],
       projectPaths: ["opencode.json", "opencode.jsonc", ".opencode"],
+      installPaths: [
+        {
+          label: "OpenCode CLI",
+          path: path.join(home, ".opencode", "bin", "opencode"),
+        },
+        {
+          label: "OpenCode data",
+          path: path.join(home, ".local", "share", "opencode"),
+        },
+        {
+          label: "OpenCode config",
+          path: path.join(home, ".config", "opencode", "opencode.json"),
+        },
+      ],
     });
   },
   render(context, { config }) {

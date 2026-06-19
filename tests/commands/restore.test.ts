@@ -4,8 +4,39 @@ import path from "node:path";
 import { run } from "../../src/cli.ts";
 import { createMemoryLogger, makeTempDir, removeTempDir } from "../helpers.ts";
 
+let claudeHome: string;
+let oldClaudeConfigDir: string | undefined;
+
 describe("poko restore", () => {
-  test("imports raw sessions into repo history", async () => {
+  test("requires native targets when restoring sessions", async () => {
+    const cwd = await makeTempDir();
+
+    try {
+      await run(["init"], cwd, createMemoryLogger());
+      const payloadPath = path.join(cwd, "restore.json");
+      await writeFile(
+        payloadPath,
+        JSON.stringify({ sessions: [restoreSession()] }),
+        "utf8",
+      );
+      const logger = createMemoryLogger();
+
+      await expect(
+        run(
+          ["restore", "--file", payloadPath, "--store", "repo", "--json"],
+          cwd,
+          logger,
+        ),
+      ).rejects.toThrow("Restore requires native targets");
+    } finally {
+      await removeTempDir(cwd);
+    }
+  });
+
+  test("imports raw sessions into repo history and claude native history", async () => {
+    claudeHome = await makeTempDir();
+    oldClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = claudeHome;
     const cwd = await makeTempDir();
 
     try {
@@ -19,7 +50,16 @@ describe("poko restore", () => {
       const restoreLogger = createMemoryLogger();
 
       const code = await run(
-        ["restore", "--file", payloadPath, "--store", "repo", "--json"],
+        [
+          "restore",
+          "--file",
+          payloadPath,
+          "--store",
+          "repo",
+          "--targets",
+          "claude",
+          "--json",
+        ],
         cwd,
         restoreLogger,
       );
@@ -52,6 +92,8 @@ describe("poko restore", () => {
       ]);
       expect(history.sessions[0]?.messages).toHaveLength(2);
     } finally {
+      restoreEnv("CLAUDE_CONFIG_DIR", oldClaudeConfigDir);
+      await removeTempDir(claudeHome);
       await removeTempDir(cwd);
     }
   });
@@ -99,6 +141,15 @@ describe("poko restore", () => {
     }
   });
 });
+
+const restoreEnv = (key: string, value: string | undefined): void => {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+
+  process.env[key] = value;
+};
 
 const restoreSession = () => ({
   schemaVersion: 1,

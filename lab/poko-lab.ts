@@ -18,6 +18,9 @@ import { pathToFileURL } from "node:url";
 import pc from "picocolors";
 import type { AgentId } from "../src/adapters/types.ts";
 import type { HistoryAgent } from "../src/history/types.ts";
+import { type GateResult, runGate } from "./gate.ts";
+
+export { type GateResult, runGate };
 
 type ParsedArgs = {
   command?: string;
@@ -25,7 +28,7 @@ type ParsedArgs = {
   flags: Record<string, string | boolean>;
 };
 
-type LabPaths = {
+export type LabPaths = {
   root: string;
   profile: string;
   run: string;
@@ -70,7 +73,7 @@ type ReportOptions = {
   run?: string;
 };
 
-type RunOptions = {
+export type RunOptions = {
   repoRoot: string;
   root?: string;
   profile?: string;
@@ -80,7 +83,7 @@ type RunOptions = {
   env?: Record<string, string | undefined>;
 };
 
-type CommandResult = {
+export type CommandResult = {
   exitCode: number;
   stdout: string;
   stderr: string;
@@ -123,14 +126,14 @@ type SessionSummary = {
   path?: string;
 };
 
-type TargetSessionSummary = {
+export type TargetSessionSummary = {
   target: string;
   title: string;
   messages: number;
   location: string;
 };
 
-type ReportSnapshot = {
+export type ReportSnapshot = {
   capturedSessions: SessionSummary[];
   targetSessions: TargetSessionSummary[];
   storeCounts: Record<string, number | string>;
@@ -156,7 +159,7 @@ type ConversationParityRow = {
   notes: string[];
 };
 
-type ScenarioResult = {
+export type ScenarioResult = {
   name: string;
   mode: "dry-run" | "write";
   startedAt: string;
@@ -196,7 +199,7 @@ type AcceptanceReport = {
 const DEFAULT_PROFILE = "default";
 const DEFAULT_RUN = "current";
 const PROJECT_DIR_NAME = "poko";
-const SEED_AGENTS: SeedAgent[] = [
+export const SEED_AGENTS: SeedAgent[] = [
   "codex",
   "claude",
   "cursor",
@@ -204,7 +207,7 @@ const SEED_AGENTS: SeedAgent[] = [
   "hermes",
   "openclaw",
 ];
-const NATIVE_TARGET_AGENTS: AgentId[] = [
+export const NATIVE_TARGET_AGENTS: AgentId[] = [
   "claude",
   "cursor",
   "t3code",
@@ -303,6 +306,10 @@ const FEATURE_CHECKS = [
       '"name": "read_file"',
       '"tool_name":"Read"',
       '"tool_name": "Read"',
+      '"tool":"Read"',
+      '"tool": "Read"',
+      '"title":"Read"',
+      '"title": "Read"',
       "read_file",
     ],
   },
@@ -422,6 +429,15 @@ const cli = async (): Promise<number> => {
         profile,
         run,
         write: Boolean(parsed.flags.write),
+        noReset: Boolean(parsed.flags["no-reset"]),
+      });
+      return 0;
+    case "gate":
+      await runGate({
+        repoRoot,
+        root,
+        profile,
+        run,
         noReset: Boolean(parsed.flags["no-reset"]),
       });
       return 0;
@@ -2298,7 +2314,7 @@ const manualCliAcceptance = async (options: {
     : [`${options.binary} binary was not found on PATH.`],
 });
 
-const writeScenarioResult = async (
+export const writeScenarioResult = async (
   paths: LabPaths,
   result: ScenarioResult,
 ): Promise<void> => {
@@ -2421,7 +2437,9 @@ const runInLab = async (options: RunOptions): Promise<number> => {
   return result.exitCode;
 };
 
-const runLabCommand = async (options: RunOptions): Promise<CommandResult> => {
+export const runLabCommand = async (
+  options: RunOptions,
+): Promise<CommandResult> => {
   const paths = createLabPaths(options);
 
   if (!(await pathExists(paths.projectDir))) {
@@ -2485,6 +2503,7 @@ export const writeReport = async (options: ReportOptions): Promise<string> => {
   const snapshot = await collectReportSnapshot(paths);
   const scenario = await readScenarioResult(paths.reportDir);
   const acceptance = await readAcceptanceReport(paths.reportDir);
+  const gate = await readGateResult(paths.reportDir);
   const reportPath = path.join(paths.reportDir, "index.html");
   const html = renderReport(
     paths,
@@ -2493,6 +2512,7 @@ export const writeReport = async (options: ReportOptions): Promise<string> => {
     snapshot,
     scenario,
     acceptance,
+    gate,
   );
 
   await writeFile(reportPath, html, "utf8");
@@ -2691,7 +2711,7 @@ const summarizeLogs = async (
   return logs.sort((left, right) => left.name.localeCompare(right.name));
 };
 
-const collectReportSnapshot = async (
+export const collectReportSnapshot = async (
   paths: LabPaths,
 ): Promise<ReportSnapshot> => {
   const stores = await summarizeStores(paths);
@@ -2849,6 +2869,18 @@ const readAcceptanceReport = async (
   }
 };
 
+const readGateResult = async (
+  reportDir: string,
+): Promise<GateResult | undefined> => {
+  try {
+    return JSON.parse(
+      await readFile(path.join(reportDir, "gate-results.json"), "utf8"),
+    ) as GateResult;
+  } catch {
+    return undefined;
+  }
+};
+
 const readCapturedHistory = async (
   paths: LabPaths,
 ): Promise<SessionSummary[]> => {
@@ -2953,6 +2985,9 @@ const collectFeatureText = async (
     "select text from projection_thread_messages",
   ]);
   text.opencode = [
+    await readFilesText(
+      path.join(paths.projectDir, ".poko", "native", "opencode"),
+    ),
     await readSqliteText(env.POKO_LAB_OPENCODE_DB, [
       "select title as text from session",
       "select text from part",
@@ -3399,6 +3434,7 @@ const renderReport = (
   snapshot: ReportSnapshot,
   scenario?: ScenarioResult,
   acceptance?: AcceptanceReport,
+  gate?: GateResult,
 ): string => {
   const generatedAt = new Date().toISOString();
 
@@ -3560,6 +3596,7 @@ const renderReport = (
   </section>
 
   ${scenario ? renderScenario(scenario) : ""}
+  ${gate ? renderGate(gate) : ""}
   ${acceptance ? renderAcceptance(acceptance) : ""}
 
   <h2>Captured History</h2>
@@ -3602,6 +3639,30 @@ const renderScenario = (scenario: ScenarioResult): string => `
     ${scenario.notes.map((note) => `<div class="muted">${escapeHtml(note)}</div>`).join("")}
   </div>
 </section>`;
+
+const renderGate = (gate: GateResult): string => `
+<h2>Launch Gate</h2>
+<section class="card">
+  <div class="title">
+    <span>${escapeHtml(gate.passed ? "Ready for paid-launch review" : "Needs hardening")}</span>
+    <span class="badge ${gate.passed ? "ok" : "missing"}">${escapeHtml(gate.passed ? "pass" : "fail")}</span>
+  </div>
+  <div class="muted">Generated ${escapeHtml(gate.gatedAt)}. Manual rows are expected for real-app visual screenshots and do not fail the synthetic CI gate.</div>
+</section>
+<table>
+  <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+  <tbody>
+    ${gate.checks
+      .map(
+        (check) => `<tr>
+          <td>${escapeHtml(check.name)}</td>
+          <td class="${check.status === "pass" ? "ok" : check.status === "fail" ? "missing" : ""}">${escapeHtml(check.status)}</td>
+          <td>${escapeHtml(check.detail)}</td>
+        </tr>`,
+      )
+      .join("")}
+  </tbody>
+</table>`;
 
 const renderAcceptance = (acceptance: AcceptanceReport): string => `
 <h2>Agent Acceptance</h2>
@@ -3773,7 +3834,10 @@ const renderLog = (log: { name: string; content: string }): string => `
   <pre>${escapeHtml(redactSecrets(log.content))}</pre>
 </section>`;
 
-const formatCommandLog = (args: string[], result: CommandResult): string =>
+export const formatCommandLog = (
+  args: string[],
+  result: CommandResult,
+): string =>
   [
     `$ ${args.map(shellQuote).join(" ")}`,
     `exit ${result.exitCode}`,
@@ -4007,12 +4071,9 @@ const shouldCopyProjectPath = (
     ".cursor",
     ".pi",
     ".cursorrules",
-    ".github/copilot-instructions.md",
     ".mcp.json",
-    ".vscode/mcp.json",
     "AGENTS.md",
     "CLAUDE.md",
-    "GEMINI.md",
     "opencode.json",
   ]);
 
@@ -4170,13 +4231,31 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const resolveLabRoot = (value?: string): string =>
-  path.resolve(
-    value ??
-      process.env.POKO_LAB_ROOT ??
-      path.join(os.homedir(), ".poko", "lab"),
+  normalizeMacSystemPath(
+    path.resolve(
+      value ??
+        process.env.POKO_LAB_ROOT ??
+        path.join(os.homedir(), ".poko", "lab"),
+    ),
   );
 
-const defaultPokoCommand = (
+const normalizeMacSystemPath = (value: string): string => {
+  if (process.platform !== "darwin") {
+    return value;
+  }
+
+  if (value === "/tmp" || value.startsWith("/tmp/")) {
+    return `/private${value}`;
+  }
+
+  if (value === "/var" || value.startsWith("/var/")) {
+    return `/private${value}`;
+  }
+
+  return value;
+};
+
+export const defaultPokoCommand = (
   repoRoot: string,
   command: string,
   ...args: string[]
@@ -4355,6 +4434,7 @@ Usage:
   bun lab/poko-lab.ts accept [--prepare] [--agent opencode,codex,claude,cursor,t3code,pi,hermes,openclaw]
   bun lab/poko-lab.ts run -- <command...>
   bun lab/poko-lab.ts smoke [--write] [--no-reset]
+  bun lab/poko-lab.ts gate [--no-reset]
   bun lab/poko-lab.ts report
 
 Options:

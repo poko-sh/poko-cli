@@ -2,7 +2,7 @@
 
 ## Motto
 
-Same conversation everywhere.
+Same project context everywhere; native resume strongest Codex ↔ Claude Code.
 
 Poko exists to move the actual working thread: messages, project context,
 useful tool evidence, files, MCPs, skills, and the native conversation shape the
@@ -59,15 +59,12 @@ Native chat sync focus:
 - Hermes Agent
 - OpenClaw
 
-Static/project context only or paused:
-
-- GitHub Copilot / VS Code
-- Antigravity
-
 Removed from MVP:
 
 - Aider
 - legacy Gemini CLI
+- Antigravity
+- GitHub Copilot / VS Code
 
 ## Safety Defaults
 

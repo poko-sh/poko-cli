@@ -18,12 +18,6 @@ const CursorAdapterSchema = z
   })
   .default({ enabled: true, mcp: true, legacyCursorrules: false });
 
-const SimpleAdapterSchema = z
-  .object({
-    enabled: z.boolean().default(true),
-  })
-  .default({ enabled: true });
-
 const McpAdapterSchema = z
   .object({
     enabled: z.boolean().default(true),
@@ -92,8 +86,6 @@ export const PokoConfigSchema = z
       .object({
         claude: ClaudeAdapterSchema,
         cursor: CursorAdapterSchema,
-        antigravity: SimpleAdapterSchema,
-        copilot: McpAdapterSchema,
         t3code: SkillsAdapterSchema,
         opencode: McpAdapterSchema,
         pi: SkillsAdapterSchema,
@@ -104,8 +96,6 @@ export const PokoConfigSchema = z
       .default({
         claude: { enabled: true, mcp: true, skills: true },
         cursor: { enabled: true, mcp: true, legacyCursorrules: false },
-        antigravity: { enabled: true },
-        copilot: { enabled: true, mcp: true },
         t3code: { enabled: true, skills: true },
         opencode: { enabled: true, mcp: true },
         pi: { enabled: true, skills: true },
@@ -129,8 +119,6 @@ export const PokoConfigSchema = z
     adapters: {
       claude: { enabled: true, mcp: true, skills: true },
       cursor: { enabled: true, mcp: true, legacyCursorrules: false },
-      antigravity: { enabled: true },
-      copilot: { enabled: true, mcp: true },
       t3code: { enabled: true, skills: true },
       opencode: { enabled: true, mcp: true },
       pi: { enabled: true, skills: true },
@@ -216,7 +204,12 @@ export const createDefaultPokoConfig = (): PokoConfig =>
 export const loadPokoContext = async (root: string): Promise<PokoContext> => {
   const absoluteRoot = path.resolve(root);
   const pokoDir = path.join(absoluteRoot, POKO_DIR);
-  const config = await loadPokoConfig(absoluteRoot);
+  const configPath = path.join(pokoDir, "poko.json");
+  const raw = await readJsonFile(
+    configPath,
+    "Run `poko init` to create .poko/poko.json.",
+  );
+  const config = parseWithSchema(PokoConfigSchema, raw, configPath);
   const mcp = await loadMcpConfig(absoluteRoot);
   const sections = {
     rules: await readOptionalText(pokoDir, "rules.md"),
@@ -225,7 +218,10 @@ export const loadPokoContext = async (root: string): Promise<PokoContext> => {
     stack: await readOptionalText(pokoDir, "stack.md"),
   };
   const skills = await loadSkills(pokoDir);
-  const warnings = findMcpWarnings(mcp.mcpServers);
+  const warnings = [
+    ...findMcpWarnings(mcp.mcpServers),
+    ...removedAdapterWarnings(raw),
+  ];
 
   return {
     root: absoluteRoot,
@@ -245,6 +241,24 @@ export const loadPokoConfig = async (root: string): Promise<PokoConfig> => {
     "Run `poko init` to create .poko/poko.json.",
   );
   return parseWithSchema(PokoConfigSchema, raw, configPath);
+};
+
+export const removedAdapterWarnings = (raw: unknown): string[] => {
+  if (!isRecord(raw) || !isRecord(raw.adapters)) {
+    return [];
+  }
+
+  const warnings: string[] = [];
+
+  for (const adapter of ["antigravity", "copilot"] as const) {
+    if (adapter in raw.adapters) {
+      warnings.push(
+        `${adapter} is no longer supported and was ignored in .poko/poko.json.`,
+      );
+    }
+  }
+
+  return warnings;
 };
 
 export const loadMcpConfig = async (root: string): Promise<McpConfig> => {
@@ -449,3 +463,6 @@ const isMissingFileError = (error: unknown): boolean =>
   error !== null &&
   "code" in error &&
   (error as { code?: string }).code === "ENOENT";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);

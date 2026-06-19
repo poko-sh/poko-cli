@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import {
   hasProjectContext,
   renderFullContext,
@@ -10,6 +12,8 @@ export const openClawAdapter: AgentAdapter = {
   id: "openclaw",
   displayName: "OpenClaw",
   detect(root) {
+    const home = os.homedir();
+
     return detectBySignals(root, {
       id: "openclaw",
       displayName: "OpenClaw",
@@ -20,6 +24,16 @@ export const openClawAdapter: AgentAdapter = {
         "TOOLS.md",
         ".agents/skills",
         ".openclaw",
+      ],
+      installPaths: [
+        {
+          label: "OpenClaw home",
+          path: path.join(home, ".openclaw"),
+        },
+        {
+          label: "OpenClaw config",
+          path: path.join(home, ".config", "openclaw"),
+        },
       ],
     });
   },

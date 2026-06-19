@@ -111,7 +111,7 @@ export const syncT3CodeNativeHistory = async (
 
   const lifecycle = await closeT3CodeForNativeSync(options);
 
-  if (lifecycle.reason) {
+  if (lifecycle.reason || !lifecycle.safeToWrite) {
     return {
       target: "t3code",
       location: dbPath,
@@ -119,7 +119,9 @@ export const syncT3CodeNativeHistory = async (
       messages: 0,
       dryRun: false,
       skipped: true,
-      reason: lifecycle.reason,
+      reason:
+        lifecycle.reason ??
+        "T3 Code native chat sync was skipped because its database was not safe to write.",
       details: {
         t3CodeWasRunning: lifecycle.wasRunning,
         t3CodeClosed: lifecycle.closed,
@@ -133,7 +135,24 @@ export const syncT3CodeNativeHistory = async (
   }
 
   const database = new Database(dbPath);
-  let result: NativeHistorySyncResult;
+  let result: NativeHistorySyncResult = {
+    target: "t3code",
+    location: dbPath,
+    sessions: 0,
+    messages: 0,
+    dryRun: false,
+    skipped: true,
+    reason: "T3 Code native chat sync did not complete.",
+    details: {
+      t3CodeWasRunning: lifecycle.wasRunning,
+      t3CodeClosed: lifecycle.closed,
+      t3CodeReopened: lifecycle.reopened,
+      sessionsSkippedFromSameAgent: countSameAgentSessions(
+        options.sessions,
+        "t3code",
+      ),
+    },
+  };
 
   try {
     database.run("pragma busy_timeout = 5000");
@@ -191,6 +210,25 @@ export const syncT3CodeNativeHistory = async (
         },
       };
     }
+  } catch (error) {
+    result = {
+      target: "t3code",
+      location: dbPath,
+      sessions: 0,
+      messages: 0,
+      dryRun: false,
+      skipped: true,
+      reason: `T3 Code native chat sync failed: ${errorMessage(error)}`,
+      details: {
+        t3CodeWasRunning: lifecycle.wasRunning,
+        t3CodeClosed: lifecycle.closed,
+        t3CodeReopened: lifecycle.reopened,
+        sessionsSkippedFromSameAgent: countSameAgentSessions(
+          options.sessions,
+          "t3code",
+        ),
+      },
+    };
   } finally {
     database.close();
     await reopenT3CodeAfterNativeSync(options, lifecycle);
@@ -217,6 +255,10 @@ const closeT3CodeForNativeSync = async (
     skipEnvVar: "POKO_T3CODE_SKIP_APP_LIFECYCLE",
     appController: options.appController,
     logger: options.logger,
+    closeTimeoutMs: options.appController?.closeTimeoutMs ?? 60000,
+    databaseReadyTimeoutMs: 30000,
+    readinessAgent: "t3code",
+    projectRoot: options.root,
   });
 
 const reopenT3CodeAfterNativeSync = async (
@@ -716,3 +758,6 @@ const deterministicUuid = (value: string): string => {
 };
 
 const validId = (value: string): boolean => value.trim().length > 0;
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);

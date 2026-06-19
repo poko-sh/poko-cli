@@ -1,11 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parseStore } from "../core/agent-parse.ts";
 import { loadPokoConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import { renderHandoff } from "../history/render.ts";
 import { loadHistorySessions } from "../history/storage.ts";
-import type { HistoryStore } from "../history/types.ts";
-
 export type HandoffOptions = {
   cwd: string;
   agent?: string;
@@ -52,14 +51,6 @@ export const runHandoff = async (options: HandoffOptions): Promise<string> => {
   options.logger.success(`wrote ${path.relative(options.cwd, handoffPath)}.`);
 
   return markdown;
-};
-
-const parseStore = (value: string): HistoryStore => {
-  if (value === "local" || value === "repo" || value === "both") {
-    return value;
-  }
-
-  throw new Error('History store must be one of "local", "repo", or "both".');
 };
 
 const parseLimit = (value: string): number => {

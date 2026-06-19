@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import {
   hasProjectContext,
   renderFullContext,
@@ -11,11 +13,23 @@ export const claudeAdapter: AgentAdapter = {
   id: "claude",
   displayName: "Claude Code",
   detect(root) {
+    const home = os.homedir();
+
     return detectBySignals(root, {
       id: "claude",
       displayName: "Claude Code",
       binaries: ["claude"],
       projectPaths: ["CLAUDE.md", ".claude", ".mcp.json"],
+      installPaths: [
+        {
+          label: "Claude Code home",
+          path: process.env.CLAUDE_CONFIG_DIR ?? path.join(home, ".claude"),
+        },
+        {
+          label: "Claude Code config",
+          path: path.join(home, ".claude.json"),
+        },
+      ],
     });
   },
   render(context, { config }) {

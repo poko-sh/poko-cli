@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import { hasProjectContext, renderFullContext } from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
 import { hasMcpServers, renderCodexMcpToml } from "./common.ts";
@@ -12,6 +14,12 @@ export const codexAdapter: AgentAdapter = {
       displayName: "Codex / AGENTS.md",
       binaries: ["codex"],
       projectPaths: ["AGENTS.md", ".codex"],
+      installPaths: [
+        {
+          label: "Codex home",
+          path: process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex"),
+        },
+      ],
     });
   },
   render(context, { config }) {

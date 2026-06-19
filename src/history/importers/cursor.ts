@@ -48,40 +48,45 @@ const captureCursorWorkspaces = async (
   const sessions: RawHistorySession[] = [];
 
   for (const workspace of workspaces) {
-    const projectRoot =
-      projectRootOverride ?? normalizeCursorWorkspacePath(workspace.folderUri);
+    try {
+      const projectRoot =
+        projectRootOverride ??
+        normalizeCursorWorkspacePath(workspace.folderUri);
 
-    if (!projectRoot) {
-      continue;
-    }
+      if (!projectRoot) {
+        continue;
+      }
 
-    const nativeSessions = await readCursorNativeSessions({
-      projectRoot,
-      workspaceId: workspace.id,
-      workspaceDatabasePath: workspace.databasePath,
-      globalStateDbPath,
-    });
-
-    if (nativeSessions.length > 0) {
-      sessions.push(...nativeSessions);
-      continue;
-    }
-
-    const messages = await readCursorPromptMessages(workspace.databasePath);
-
-    if (messages.length > 0) {
-      sessions.push({
-        schemaVersion: 1,
-        id: `cursor-${path.basename(workspace.directory)}`,
-        sourceAgent: "cursor",
-        title: titleFrom("Cursor workspace prompts", messages),
+      const nativeSessions = await readCursorNativeSessions({
         projectRoot,
-        createdAt: messages[0]?.timestamp,
-        updatedAt: messages.at(-1)?.timestamp,
-        sourcePath: workspace.databasePath,
-        messages,
-        rawEvents: messages.map((message) => message.raw),
+        workspaceId: workspace.id,
+        workspaceDatabasePath: workspace.databasePath,
+        globalStateDbPath,
       });
+
+      if (nativeSessions.length > 0) {
+        sessions.push(...nativeSessions);
+        continue;
+      }
+
+      const messages = await readCursorPromptMessages(workspace.databasePath);
+
+      if (messages.length > 0) {
+        sessions.push({
+          schemaVersion: 1,
+          id: `cursor-${path.basename(workspace.directory)}`,
+          sourceAgent: "cursor",
+          title: titleFrom("Cursor workspace prompts", messages),
+          projectRoot,
+          createdAt: messages[0]?.timestamp,
+          updatedAt: messages.at(-1)?.timestamp,
+          sourcePath: workspace.databasePath,
+          messages,
+          rawEvents: messages.map((message) => message.raw),
+        });
+      }
+    } catch {
+      // Cursor may still be reopening and holding its SQLite files.
     }
   }
 
@@ -104,9 +109,16 @@ const readCursorNativeSessions = async (options: {
     return [];
   }
 
-  const workspaceDatabase = new Database(options.workspaceDatabasePath, {
-    readonly: true,
-  });
+  let workspaceDatabase: Database;
+
+  try {
+    workspaceDatabase = new Database(options.workspaceDatabasePath, {
+      readonly: true,
+    });
+  } catch {
+    globalDatabase.close();
+    return [];
+  }
 
   try {
     if (!tableExists(globalDatabase, "cursorDiskKV")) {
@@ -270,7 +282,13 @@ const readCursorComposerSession = (options: {
 const readCursorPromptMessages = async (
   databasePath: string,
 ): Promise<RawHistoryMessage[]> => {
-  const database = new Database(databasePath, { readonly: true });
+  let database: Database;
+
+  try {
+    database = new Database(databasePath, { readonly: true });
+  } catch {
+    return [];
+  }
 
   try {
     const promptsRaw = queryValue(database, "aiService.prompts");

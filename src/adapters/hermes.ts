@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import {
   hasProjectContext,
   renderFullContext,
@@ -15,6 +17,12 @@ export const hermesAdapter: AgentAdapter = {
       displayName: "Hermes Agent",
       binaries: ["hermes"],
       projectPaths: ["AGENTS.md", ".hermes.md", ".agents/skills", ".hermes"],
+      installPaths: [
+        {
+          label: "Hermes home",
+          path: process.env.HERMES_HOME ?? path.join(os.homedir(), ".hermes"),
+        },
+      ],
     });
   },
   render(context, { config }) {

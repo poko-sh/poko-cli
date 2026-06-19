@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an improvement or new capability
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What workflow is painful today? Who benefits?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should Poko behave? CLI flags, output shape, or adapter changes welcome.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Free CLI (local-first)
+        - Paid app / cloud (future)
+        - Documentation only
+        - Lab / testing harness
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      options:
+        - label: I checked README History Compatibility and existing workarounds (handoff, dry-run, etc.)

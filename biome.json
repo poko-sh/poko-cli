@@ -22,6 +22,14 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!dist", "!bin", "!node_modules", "!.research"]
+    "includes": [
+      "**",
+      "!dist",
+      "!bin",
+      "!node_modules",
+      "!.research",
+      "!.poko/v1-ship-audit-eval",
+      "!.poko/native"
+    ]
   }
 }

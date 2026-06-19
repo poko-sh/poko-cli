@@ -1,5 +1,8 @@
+import os from "node:os";
+import path from "node:path";
 import { hasProjectContext, renderFullContext } from "../core/compiler.ts";
 import { detectBySignals } from "../core/detect.ts";
+import { resolveCursorGlobalStateDbPath } from "../history/cursor-storage.ts";
 import { hasMcpServers, renderMcpJson } from "./common.ts";
 import type { AgentAdapter, FileOperation } from "./types.ts";
 
@@ -12,6 +15,7 @@ export const cursorAdapter: AgentAdapter = {
       displayName: "Cursor",
       binaries: ["cursor"],
       projectPaths: [".cursor", ".cursorrules"],
+      installPaths: cursorInstallPaths(),
     });
   },
   render(context, { config }) {
@@ -67,4 +71,31 @@ ${renderFullContext(context, "Cursor Project Context")}`;
 
     return operations;
   },
+};
+
+const cursorInstallPaths = () => {
+  const home = os.homedir();
+
+  return [
+    {
+      label: "Cursor app",
+      path: process.env.POKO_CURSOR_APP_PATH ?? "/Applications/Cursor.app",
+    },
+    {
+      label: "user Cursor app",
+      path: path.join(home, "Applications", "Cursor.app"),
+    },
+    {
+      label: "Cursor profile",
+      path: path.join(home, "Library", "Application Support", "Cursor"),
+    },
+    {
+      label: "Cursor global state database",
+      path: resolveCursorGlobalStateDbPath(),
+    },
+    {
+      label: "Cursor user config",
+      path: path.join(home, ".cursor"),
+    },
+  ];
 };

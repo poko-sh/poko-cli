@@ -1,3 +1,4 @@
+import { parseStore } from "../core/agent-parse.ts";
 import { loadPokoConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import { loadHistoryIndex, loadHistorySessions } from "../history/storage.ts";
@@ -88,14 +89,6 @@ export const runHistoryReport = async (
     sessions,
     entries,
   };
-};
-
-const parseStore = (value: string): HistoryStore => {
-  if (value === "local" || value === "repo" || value === "both") {
-    return value;
-  }
-
-  throw new Error('History store must be one of "local", "repo", or "both".');
 };
 
 const parseLimit = (value: string | undefined): number | undefined => {

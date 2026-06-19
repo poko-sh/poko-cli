@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import {
   hasProjectContext,
   renderFullContext,
@@ -15,6 +17,14 @@ export const piAdapter: AgentAdapter = {
       displayName: "Pi",
       binaries: ["pi"],
       projectPaths: ["AGENTS.md", "CLAUDE.md", ".pi", ".agents/skills"],
+      installPaths: [
+        {
+          label: "Pi agent home",
+          path:
+            process.env.PI_CODING_AGENT_DIR ??
+            path.join(os.homedir(), ".pi", "agent"),
+        },
+      ],
     });
   },
   render(context, { config }) {

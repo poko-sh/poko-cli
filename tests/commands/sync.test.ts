@@ -150,10 +150,6 @@ describe("poko sync", () => {
     });
 
     const paths = results.map((result) => result.path);
-    expect(paths).toContain("GEMINI.md");
-    expect(paths).toContain(".agents/rules/poko.md");
-    expect(paths).toContain(".github/copilot-instructions.md");
-    expect(paths).toContain(".vscode/mcp.json");
     expect(paths).toContain("AGENTS.md");
     expect(paths).toContain("opencode.json");
     expect(paths).not.toContain(".gemini/settings.json");
@@ -674,6 +670,11 @@ describe("poko sync", () => {
       "synced 1 session(s), 2 message(s) into cursor native history",
     );
     expect(logger.messages.join("\n")).toContain("staleComposersRemoved=1");
+    expect(logger.messages.join("\n")).toContain(
+      "read-only archive + Continue chat",
+    );
+    expect(logger.messages.join("\n")).toContain("reading only");
+    expect(logger.messages.join("\n")).toContain("Backed up Cursor databases");
 
     const workspaceDirs = await readdir(cursorStorage);
     expect(workspaceDirs).toHaveLength(1);
@@ -689,11 +690,18 @@ describe("poko sync", () => {
           ).value,
         ),
       ) as { allComposers: Array<{ composerId: string; name: string }> };
-      expect(headers.allComposers).toHaveLength(1);
-      expect(headers.allComposers[0]?.name).toBe("Sync history");
-      expect(headers.allComposers[0]?.composerId).not.toBe("stale-composer");
+      expect(headers.allComposers).toHaveLength(2);
+      const archiveHead = headers.allComposers.find((head) =>
+        head.name?.startsWith("[History]"),
+      );
+      const continuationHead = headers.allComposers.find((head) =>
+        head.name?.startsWith("Continue:"),
+      );
+      expect(archiveHead?.name).toBe("[History] Sync history");
+      expect(continuationHead?.name).toBe("Continue: Sync history");
+      expect(archiveHead?.composerId).not.toBe("stale-composer");
 
-      const composerId = headers.allComposers[0]?.composerId ?? "";
+      const composerId = archiveHead?.composerId ?? "";
       const composer = JSON.parse(
         String(
           (
@@ -703,14 +711,38 @@ describe("poko sync", () => {
           ).value,
         ),
       ) as {
+        agentBackend: string;
+        status: string;
         modelConfig: { modelName: string };
-        pokoImport: { originator: string };
+        pokoImport: { originator: string; readOnly?: boolean };
         fullConversationHeadersOnly: Array<{ bubbleId: string; type: number }>;
       };
+      expect(composer.agentBackend).toBe("cursor-agent");
+      expect(composer.status).toBe("none");
       expect(composer.modelConfig.modelName).toBe("composer-2.5");
       expect(composer.pokoImport.originator).toBe("poko");
+      expect(composer.pokoImport.readOnly).toBe(true);
       expect(
         composer.fullConversationHeadersOnly.map((head) => head.type),
+      ).toEqual([1, 2]);
+
+      const continuation = JSON.parse(
+        String(
+          (
+            database
+              .query("select value from cursorDiskKV where key = ?")
+              .get(`composerData:${continuationHead?.composerId ?? ""}`) as {
+              value: string;
+            }
+          ).value,
+        ),
+      ) as {
+        pokoImport: { continuation?: boolean };
+        fullConversationHeadersOnly: Array<{ type: number }>;
+      };
+      expect(continuation.pokoImport.continuation).toBe(true);
+      expect(
+        continuation.fullConversationHeadersOnly.map((head) => head.type),
       ).toEqual([1, 2]);
 
       const bubbleRows = database
@@ -764,7 +796,10 @@ describe("poko sync", () => {
           ).value,
         ),
       ) as { allComposers: Array<{ composerId: string; name: string }> };
-      const composerId = headers.allComposers[0]?.composerId ?? "";
+      const archiveHead = headers.allComposers.find((head) =>
+        head.name?.startsWith("[History]"),
+      );
+      const composerId = archiveHead?.composerId ?? "";
       const composer = JSON.parse(
         String(
           (

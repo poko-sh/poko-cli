@@ -1,7 +1,5 @@
-import { antigravityAdapter } from "./antigravity.ts";
 import { claudeAdapter } from "./claude.ts";
 import { codexAdapter } from "./codex.ts";
-import { copilotAdapter } from "./copilot.ts";
 import { cursorAdapter } from "./cursor.ts";
 import { hermesAdapter } from "./hermes.ts";
 import { openClawAdapter } from "./openclaw.ts";
@@ -13,8 +11,6 @@ import type { AgentAdapter, AgentId } from "./types.ts";
 export const ADAPTERS: AgentAdapter[] = [
   claudeAdapter,
   cursorAdapter,
-  antigravityAdapter,
-  copilotAdapter,
   t3CodeAdapter,
   openCodeAdapter,
   piAdapter,

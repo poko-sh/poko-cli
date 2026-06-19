@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import pc from "picocolors";
+import { runAgentsWaitReady } from "./commands/agents-wait-ready.ts";
 import { runCapture, runCaptureReport } from "./commands/capture.ts";
 import { runDoctor } from "./commands/doctor.ts";
 import { runExport } from "./commands/export.ts";
@@ -7,6 +8,7 @@ import { runHandoff } from "./commands/handoff.ts";
 import { runHistory, runHistoryReport } from "./commands/history.ts";
 import { runInit } from "./commands/init.ts";
 import { runRestore, runRestoreReport } from "./commands/restore.ts";
+import { runStatus } from "./commands/status.ts";
 import { runSync, runSyncReport } from "./commands/sync.ts";
 import {
   createLogger,
@@ -91,6 +93,43 @@ export const run = async (
           logger: outputLogger,
         });
         return 0;
+      case "agents": {
+        const subcommand = parsed.positional[0];
+
+        if (subcommand === "wait-ready") {
+          if (parsed.flags.help || parsed.flags.h) {
+            outputLogger.plain(agentsWaitReadyHelpText());
+            return 0;
+          }
+
+          const timeoutMs = Number.parseInt(
+            flagString(parsed.flags.timeout) ?? "30000",
+            10,
+          );
+          const report = await runAgentsWaitReady({
+            cwd,
+            agents: flagString(parsed.flags.agents),
+            timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 30_000,
+            wait: !parsed.flags.probe,
+          });
+
+          if (json) {
+            outputLogger.plain(toJson(report));
+            return 0;
+          }
+
+          for (const agent of report.agents) {
+            outputLogger.plain(
+              `${agent.id}: ${agent.ready ? "ready" : "waiting"}${agent.reason ? ` (${agent.reason})` : ""}`,
+            );
+          }
+
+          return report.ready ? 0 : 1;
+        }
+
+        outputLogger.plain(agentsHelpText());
+        return 0;
+      }
       case "export":
         if (parsed.flags.help || parsed.flags.h) {
           outputLogger.plain(exportHelpText());
@@ -194,25 +233,19 @@ export const run = async (
         }
 
         if (json) {
-          const report = await runDoctor({
+          const report = await runStatus({
             cwd,
             logger: createSilentLogger(),
-            compact: true,
           });
           outputLogger.plain(
-            toJson(
-              report
-                ? { ...report, command: "status" }
-                : uninitializedReport("status", cwd),
-            ),
+            toJson(report ?? uninitializedReport("status", cwd)),
           );
           return 0;
         }
 
-        await runDoctor({
+        await runStatus({
           cwd,
           logger: outputLogger,
-          compact: true,
         });
         return 0;
       case "handoff":
@@ -321,7 +354,9 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 };
 
 const expectsValue = (flag: string): boolean =>
-  ["agent", "targets", "file", "store", "limit"].includes(flag);
+  ["agent", "agents", "targets", "file", "store", "limit", "timeout"].includes(
+    flag,
+  );
 
 const flagString = (value: string | boolean | undefined): string | undefined =>
   typeof value === "string" ? value : undefined;
@@ -370,15 +405,16 @@ Usage:
   poko doctor [--json]
   poko handoff <agent> [--stdout] [--raw] [--limit 5]
   poko restore --file <path> [--targets a,b] [--all] [--dry-run] [--json]
+  poko agents wait-ready --agents cursor,t3code [--timeout 30000] [--probe] [--json]
 
 Global options:
   --private-display      Hide email-like values in CLI output
 
 Agents:
-  claude, cursor, antigravity, copilot, t3code, opencode, pi, hermes, openclaw, codex
+  claude, cursor, t3code, opencode, pi, hermes, openclaw, codex
 
 Aliases:
-  agy -> antigravity, vscode -> copilot, t3 -> t3code, oc -> opencode, pi-coding-agent -> pi, hermes-agent -> hermes, claw -> openclaw
+  t3 -> t3code, oc -> opencode, pi-coding-agent -> pi, hermes-agent -> hermes, claw -> openclaw
 
 Examples:
   poko init
@@ -388,7 +424,7 @@ Examples:
   poko doctor
   poko capture --all
   poko handoff cursor --stdout
-  poko export antigravity --stdout
+  poko export cursor --stdout
 `;
 
 const initHelpText = (): string => `${pc.bold("poko init")}
@@ -403,6 +439,9 @@ Options:
 const syncHelpText = (): string => `${pc.bold("poko sync")}
 
 Detects installed/configured agents and writes their project context files and native chat history.
+Full native chat resume is strongest between Codex and Claude Code. Cursor imports cross-agent history for reading only.
+See README "History Compatibility" or \`poko sync --json\` -> historyCompatibility for the full table.
+
 With --global, syncs all locally discoverable project chat history into native agent stores.
 
 Options:
@@ -457,10 +496,10 @@ Options:
 
 const doctorHelpText = (): string => `${pc.bold("poko doctor")}
 
-Checks project context sources, adapter detection, captured history, and native sync dry-run details.
+Checks project context sources, adapter detection, captured history, native sync dry-run details, and history compatibility limits.
 
 Options:
-  --json            Print machine-readable doctor report
+  --json            Print machine-readable doctor report (includes historyCompatibility)
 `;
 
 const statusHelpText = (): string => `${pc.bold("poko status")}
@@ -495,6 +534,26 @@ Options:
   --store <store>    local, repo, or both
   --dry-run          Preview without writing local/native history
   --json             Print machine-readable restore report
+`;
+
+const agentsHelpText = (): string => `${pc.bold("poko agents")}
+
+Agent lifecycle helpers for the desktop app and automation.
+
+Commands:
+  wait-ready   Wait until native agent databases can be read safely
+`;
+
+const agentsWaitReadyHelpText =
+  (): string => `${pc.bold("poko agents wait-ready")}
+
+Polls native agent databases until they can be opened read-only.
+
+Options:
+  --agents <list>    Comma-separated agents to probe (cursor, t3code)
+  --timeout <ms>     Maximum wait time (default: 30000)
+  --probe            Probe once instead of waiting
+  --json             Print machine-readable readiness report
 `;
 
 if (import.meta.main) {

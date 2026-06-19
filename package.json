@@ -1,5 +1,5 @@
 {
-  "name": "poko",
+  "name": "@poko-sh/cli",
   "version": "0.1.0",
   "description": "Your pocket context buddy for AI coding agents.",
   "type": "module",
@@ -7,7 +7,7 @@
     "poko": "./dist/cli.js"
   },
   "files": [
-    "dist",
+    "dist/cli.js",
     "docs",
     "LICENSE",
     "README.md"
@@ -27,6 +27,7 @@
     "lab": "bun lab/poko-lab.ts",
     "lab:reset": "bun lab/poko-lab.ts reset",
     "lab:smoke": "bun lab/poko-lab.ts smoke",
+    "lab:gate": "bun lab/poko-lab.ts gate",
     "lab:scenario": "bun lab/poko-lab.ts scenario",
     "lab:report": "bun lab/poko-lab.ts report",
     "lab:docker": "docker compose -f lab/docker-compose.yml run --rm poko-lab"

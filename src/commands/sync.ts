@@ -1,10 +1,10 @@
 import { ADAPTERS, getAdapter } from "../adapters/index.ts";
-import type { AgentAdapter, FileOperation } from "../adapters/types.ts";
-import {
-  type AgentId,
-  resolveAgentId,
-  supportedAgentList,
+import type {
+  AgentAdapter,
+  AgentId,
+  FileOperation,
 } from "../adapters/types.ts";
+import { parseAgentId, parseAgentList } from "../core/agent-parse.ts";
 import {
   BunFileMissingError,
   createDefaultPokoConfig,
@@ -24,6 +24,12 @@ import {
   buildProjectHistorySync,
   type ProjectHistorySyncResult,
 } from "../history/project-sync.ts";
+import {
+  buildHistoryCompatibilityReport,
+  collectHistorySyncWarnings,
+  getAgentSyncCapabilities,
+  type HistoryCompatibilityReport,
+} from "../history/sync-capabilities.ts";
 import type { RawHistorySession } from "../history/types.ts";
 
 export type SyncOptions = {
@@ -74,6 +80,7 @@ export type SyncReport = {
       reason?: string;
       details?: Record<string, number | string | boolean>;
     }>;
+    appCloseAgents?: string[];
   };
   global?: {
     projects: Array<{
@@ -91,6 +98,7 @@ export type SyncReport = {
       reason?: string;
     }>;
   };
+  historyCompatibility: HistoryCompatibilityReport;
   warnings: string[];
 };
 
@@ -134,6 +142,7 @@ export const runSyncReport = async (
       agents: [],
       files: [],
       changedFiles: 0,
+      historyCompatibility: buildHistoryCompatibilityReport(),
       warnings: context.warnings,
     };
   }
@@ -177,6 +186,23 @@ export const runSyncReport = async (
     }
   }
 
+  const historyWarnings =
+    historySync && !options.noHistory
+      ? [
+          ...historySync.warnings,
+          ...collectHistorySyncWarnings({
+            targetAgents: adapters.map((adapter) => adapter.id),
+            sessions: historySync.sessions,
+          }),
+        ]
+      : [];
+
+  if (!options.quiet) {
+    for (const warning of historyWarnings) {
+      options.logger.warn(warning);
+    }
+  }
+
   return {
     schemaVersion: 1,
     command: "sync",
@@ -197,7 +223,8 @@ export const runSyncReport = async (
           skippedOlderSessions: 0,
           nativeTargets: [],
         },
-    warnings: context.warnings,
+    historyCompatibility: buildHistoryCompatibilityReport(),
+    warnings: [...context.warnings, ...historyWarnings],
   };
 };
 
@@ -239,6 +266,7 @@ const runGlobalSyncReport = async (
         projects: [],
         capturedAgents: [],
       },
+      historyCompatibility: buildHistoryCompatibilityReport(),
       warnings: [],
     };
   }
@@ -259,6 +287,17 @@ const runGlobalSyncReport = async (
     );
   }
 
+  const historyWarnings = collectHistorySyncWarnings({
+    targetAgents,
+    sessions: globalSync.sessions,
+  });
+
+  if (!options.quiet) {
+    for (const warning of historyWarnings) {
+      options.logger.warn(warning);
+    }
+  }
+
   return {
     schemaVersion: 1,
     command: "sync",
@@ -275,7 +314,8 @@ const runGlobalSyncReport = async (
       projects: globalSync.projects,
       capturedAgents: globalSync.capturedAgents,
     },
-    warnings: globalSync.warnings,
+    historyCompatibility: buildHistoryCompatibilityReport(),
+    warnings: [...globalSync.warnings, ...historyWarnings],
   };
 };
 
@@ -293,6 +333,7 @@ const summarizeHistorySync = (
   })),
   skippedOlderSessions: result.skipped.length,
   nativeTargets: result.nativeTargets.map((target) => ({ ...target })),
+  appCloseAgents: collectAppCloseAgents(result.nativeTargets),
 });
 
 const summarizeGlobalHistorySync = (
@@ -310,7 +351,29 @@ const summarizeGlobalHistorySync = (
   })),
   skippedOlderSessions: 0,
   nativeTargets: result.nativeTargets.map((target) => ({ ...target })),
+  appCloseAgents: collectAppCloseAgents(result.nativeTargets),
 });
+
+const collectAppCloseAgents = (
+  nativeTargets: Array<{
+    target: string;
+    dryRun: boolean;
+    skipped: boolean;
+    sessions: number;
+  }>,
+): string[] => [
+  ...new Set(
+    nativeTargets
+      .filter(
+        (target) =>
+          !target.dryRun &&
+          !target.skipped &&
+          target.sessions > 0 &&
+          getAgentSyncCapabilities(target.target as AgentId)?.requiresAppClose,
+      )
+      .map((target) => target.target),
+  ),
+];
 
 const reportGlobalHistorySync = (
   result: GlobalHistorySyncResult,
@@ -397,7 +460,7 @@ const reportHistorySync = (
     }
 
     logger.info(
-      `${dryRun ? "would sync" : "synced"} ${nativeTarget.sessions} session(s), ${nativeTarget.messages} message(s) into ${nativeTarget.target} native history.`,
+      `${dryRun ? "would sync" : "synced"} ${nativeTarget.sessions} session(s), ${nativeTarget.messages} message(s) into ${nativeTarget.target} native history${cursorSuccessSuffix(result, nativeTarget)}.`,
     );
     reportNativeTargetDetails(
       nativeTarget.location,
@@ -411,6 +474,21 @@ const reportHistorySync = (
       `skipped ${result.skipped.length} older same-path history session(s) from before this .poko project was initialized.`,
     );
   }
+};
+
+const cursorSuccessSuffix = (
+  result: ProjectHistorySyncResult,
+  nativeTarget: ProjectHistorySyncResult["nativeTargets"][number],
+): string => {
+  if (nativeTarget.target !== "cursor") {
+    return "";
+  }
+
+  const hasCrossAgentSessions = result.sessions.some(
+    (session) => session.sourceAgent !== "cursor",
+  );
+
+  return hasCrossAgentSessions ? " (read-only archive + Continue chat)" : "";
 };
 
 const reportHistorySessions = (
@@ -584,28 +662,6 @@ const operationIdentity = (operation: FileOperation): string => {
         arrayUnion: operation.arrayUnion,
       });
   }
-};
-
-const parseAgentId = (value: string): AgentId => {
-  const agent = resolveAgentId(value);
-
-  if (agent) {
-    return agent;
-  }
-
-  throw new Error(
-    `Unknown agent "${value}". Supported agents: ${supportedAgentList()}.`,
-  );
-};
-
-const parseAgentList = (value: string): AgentId[] => {
-  const agents = value
-    .split(",")
-    .map((agent) => agent.trim())
-    .filter(Boolean)
-    .map(parseAgentId);
-
-  return [...new Set(agents)];
 };
 
 const getRequiredAdapter = (agent: AgentId): AgentAdapter => {
