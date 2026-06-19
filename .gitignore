@@ -11,6 +11,7 @@ bin/
 .poko/backups/
 .poko/v1-ship-audit-eval/
 .research/
+.maintainer/
 
 # Local lab state must stay private; auth baselines live outside the repo by default.
 lab/.state/

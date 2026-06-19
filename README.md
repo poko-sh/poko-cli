@@ -268,7 +268,7 @@ Standalone binaries can be added later with:
 bun run compile
 ```
 
-Tauri sidecar binaries for the paid app can be built with:
+Tauri sidecar binaries for a future desktop app can be built with:
 
 ```sh
 bun run compile:darwin-arm64
@@ -277,12 +277,6 @@ bun run compile:linux-x64
 bun run compile:windows-x64
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and PR expectations.
-See [docs/publishing.md](docs/publishing.md) for the npm-first publishing plan
-and future Homebrew tap strategy.
-
 ## OpenCore
 
-Local `init`, `sync`, `export`, `capture`, `history`, and `handoff` are free forever. Pro features such as always-on background capture, cloud sync, AI translation, analytics, marketplace, memory server, and teams are isolated behind a simple license gate for future work.
-
-The open-source CLI stays local-first. The future paid app can sit on top of the same sync engine: macOS first, cross-platform once the desktop shell and agent-lifecycle handling are proven. See `docs/product-roadmap.md` for the product boundary.
+Local `init`, `sync`, `export`, `capture`, `history`, and `handoff` are free forever. The open-source CLI stays local-first.

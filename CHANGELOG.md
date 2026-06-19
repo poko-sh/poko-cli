@@ -12,7 +12,7 @@ All notable changes to `@poko.sh/cli` are documented here. The format is based o
 - `poko restore` for cloud/desktop session restore flows
 - `poko agents wait-ready` for SQLite write coordination
 - Lab gate for storage-level native sync parity checks
-- CONTRIBUTING, SECURITY, and issue templates
+- SECURITY.md and issue templates
 
 ### Fixed
 
