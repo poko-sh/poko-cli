@@ -583,6 +583,10 @@ describe("poko sync", () => {
       .split("\n")
       .map((line) => JSON.parse(line) as { type: string; payload?: unknown });
     expect(rows[0]?.type).toBe("session_meta");
+    expect(
+      (rows[0]?.payload as { model_provider?: unknown } | undefined)
+        ?.model_provider,
+    ).toBe("openai");
     expect(rows.map((row) => row.type)).toEqual([
       "session_meta",
       "event_msg",

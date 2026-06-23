@@ -151,7 +151,7 @@ const renderCodexRollout = (
         project_id: session.projectId,
         source: "cli",
         thread_source: "user",
-        model_provider: null,
+        model_provider: "openai",
         base_instructions: null,
         memory_mode: "disabled",
       },
