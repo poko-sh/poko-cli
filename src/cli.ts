@@ -394,6 +394,8 @@ const uninitializedReport = (command: string, cwd: string) => ({
 export const helpText =
   (): string => `${pc.bold("poko")} - your pocket context buddy
 
+Public alpha focus: switch between Codex and Claude Code without losing project context.
+
 Usage:
   poko init [--yes] [--force]
   poko sync [--all] [--agent <agent>] [--targets a,b] [--dry-run] [--diff] [--backup] [--no-history] [--json]
@@ -411,20 +413,19 @@ Global options:
   --private-display      Hide email-like values in CLI output
 
 Agents:
-  claude, cursor, t3code, opencode, pi, hermes, openclaw, codex
+  Core alpha: codex, claude
+  Limited: cursor
+  Experimental: t3code, opencode, pi, hermes, openclaw
 
 Aliases:
   t3 -> t3code, oc -> opencode, pi-coding-agent -> pi, hermes-agent -> hermes, claw -> openclaw
 
 Examples:
   poko init
-  poko sync --all
-  poko sync --global --all --dry-run
-  poko status
   poko doctor
-  poko capture --all
-  poko handoff cursor --stdout
-  poko export cursor --stdout
+  poko sync --targets codex,claude --dry-run
+  poko sync --targets codex,claude
+  poko handoff claude --stdout
 `;
 
 const initHelpText = (): string => `${pc.bold("poko init")}
@@ -439,13 +440,14 @@ Options:
 const syncHelpText = (): string => `${pc.bold("poko sync")}
 
 Detects installed/configured agents and writes their project context files and native chat history.
-Full native chat resume is strongest between Codex and Claude Code. Cursor imports cross-agent history for reading only.
+Public alpha focus: Codex and Claude Code full native resume.
+Cursor imports cross-agent history for reading only. Other adapters are experimental and opt-in.
 See README "History Compatibility" or \`poko sync --json\` -> historyCompatibility for the full table.
 
 With --global, syncs all locally discoverable project chat history into native agent stores.
 
 Options:
-  --all             Sync every enabled adapter
+  --all             Sync every enabled adapter (new projects enable Codex and Claude by default)
   --agent <agent>   Sync one adapter
   --targets <list>  Sync a comma-separated agent list
   --global          Sync all discoverable local project histories; no static files are written
@@ -497,6 +499,7 @@ Options:
 const doctorHelpText = (): string => `${pc.bold("poko doctor")}
 
 Checks project context sources, adapter detection, captured history, native sync dry-run details, and history compatibility limits.
+Use this first for the public alpha Codex ↔ Claude Code route.
 
 Options:
   --json            Print machine-readable doctor report (includes historyCompatibility)

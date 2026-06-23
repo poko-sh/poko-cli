@@ -37,7 +37,7 @@ export type HistoryCompatibilityReport = {
 };
 
 export const SYNC_CAPABILITY_SUMMARY =
-  "Poko syncs project context everywhere it supports. Native chat resume works best between Codex and Claude Code. Cursor can import cross-agent history for reading, but imported threads cannot continue sending messages.";
+  "Public alpha focuses on Codex and Claude Code full native resume. Cursor is limited to readable imports, and other adapters are experimental opt-ins.";
 
 const hasCrossAgentSessions = (context: SyncWarningContext): boolean =>
   context.sessions.some(
@@ -134,7 +134,8 @@ export const AGENT_SYNC_CAPABILITIES: AgentSyncCapabilities[] = [
 
 export const PRIMARY_HISTORY_ROUTES = [
   "Codex ↔ Claude Code — full native chat import and resume",
-  "Cursor — static context plus read-only cross-agent history; use Continue chat to start fresh",
+  "Cursor — limited read-only cross-agent history; use Continue chat to start fresh",
+  "Experimental adapters — opt in from .poko/poko.json when you want to test them",
   "poko handoff — portable markdown fallback when native resume is unavailable",
 ];
 

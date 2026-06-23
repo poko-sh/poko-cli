@@ -1,6 +1,6 @@
 {
   "name": "@poko.sh/cli",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Your pocket context buddy for AI coding agents.",
   "type": "module",
   "bin": {

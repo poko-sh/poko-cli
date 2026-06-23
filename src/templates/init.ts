@@ -11,28 +11,28 @@ export const DEFAULT_POKO_CONFIG = `{
       "skills": true
     },
     "cursor": {
-      "enabled": true,
+      "enabled": false,
       "mcp": true,
       "legacyCursorrules": false
     },
     "t3code": {
-      "enabled": true,
+      "enabled": false,
       "skills": true
     },
     "opencode": {
-      "enabled": true,
+      "enabled": false,
       "mcp": true
     },
     "pi": {
-      "enabled": true,
+      "enabled": false,
       "skills": true
     },
     "hermes": {
-      "enabled": true,
+      "enabled": false,
       "skills": true
     },
     "openclaw": {
-      "enabled": true,
+      "enabled": false,
       "skills": true
     },
     "codex": {
@@ -48,10 +48,10 @@ export const DEFAULT_POKO_CONFIG = `{
     "agents": {
       "codex": true,
       "claude": true,
-      "cursor": true,
-      "pi": true,
-      "hermes": true,
-      "openclaw": true
+      "cursor": false,
+      "pi": false,
+      "hermes": false,
+      "openclaw": false
     }
   },
   "pro": {

@@ -11,20 +11,20 @@
       "skills": true
     },
     "cursor": {
-      "enabled": true,
+      "enabled": false,
       "mcp": true,
       "legacyCursorrules": false
     },
     "t3code": {
-      "enabled": true,
+      "enabled": false,
       "skills": true
     },
     "opencode": {
-      "enabled": true,
+      "enabled": false,
       "mcp": true
     },
     "pi": {
-      "enabled": true,
+      "enabled": false,
       "skills": true
     },
     "codex": {
@@ -40,8 +40,8 @@
     "agents": {
       "codex": true,
       "claude": true,
-      "cursor": true,
-      "pi": true
+      "cursor": false,
+      "pi": false
     }
   },
   "pro": {

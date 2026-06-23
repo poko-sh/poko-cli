@@ -21,9 +21,22 @@ describe("poko init", () => {
 
     expect(results.every((result) => result.action === "created")).toBe(true);
     expect(results.map((result) => result.path)).toEqual([".poko/poko.json"]);
-    expect(await readFile(path.join(cwd, ".poko/poko.json"), "utf8")).toContain(
-      '"schemaVersion": 1',
-    );
+    const config = JSON.parse(
+      await readFile(path.join(cwd, ".poko/poko.json"), "utf8"),
+    ) as {
+      schemaVersion: number;
+      adapters: Record<string, { enabled: boolean }>;
+      history: { agents: Record<string, boolean> };
+    };
+    expect(config.schemaVersion).toBe(1);
+    expect(config.adapters.codex?.enabled).toBe(true);
+    expect(config.adapters.claude?.enabled).toBe(true);
+    expect(config.adapters.cursor?.enabled).toBe(false);
+    expect(config.adapters.opencode?.enabled).toBe(false);
+    expect(config.adapters.pi?.enabled).toBe(false);
+    expect(config.history.agents.codex).toBe(true);
+    expect(config.history.agents.claude).toBe(true);
+    expect(config.history.agents.cursor).toBe(false);
     expect(await Bun.file(path.join(cwd, ".poko/rules.md")).exists()).toBe(
       false,
     );

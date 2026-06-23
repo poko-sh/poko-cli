@@ -127,7 +127,7 @@ export const runSyncReport = async (
   if (adapters.length === 0) {
     if (!options.quiet) {
       options.logger.warn(
-        "no supported agents detected. Try `poko sync --all`.",
+        "no supported agents detected. Try `poko doctor` or `poko sync --targets codex,claude --dry-run`.",
       );
     }
 

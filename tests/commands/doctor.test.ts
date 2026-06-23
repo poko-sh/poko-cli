@@ -81,6 +81,7 @@ describe("poko doctor", () => {
     expect(output).toContain("claude: would sync 1 session(s), 2 message(s)");
     expect(output).toContain("sessionsSkippedFromSameAgent=0");
     expect(output).toContain("History Compatibility");
+    expect(output).toContain("Public alpha focuses on Codex and Claude Code");
     expect(output).toContain("Codex ↔ Claude Code");
     expect(output).toContain("Warnings");
   });

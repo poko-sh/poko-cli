@@ -12,25 +12,32 @@ const ClaudeAdapterSchema = z
 
 const CursorAdapterSchema = z
   .object({
-    enabled: z.boolean().default(true),
+    enabled: z.boolean().default(false),
     mcp: z.boolean().default(true),
     legacyCursorrules: z.boolean().default(false),
   })
-  .default({ enabled: true, mcp: true, legacyCursorrules: false });
+  .default({ enabled: false, mcp: true, legacyCursorrules: false });
 
-const McpAdapterSchema = z
+const CoreMcpAdapterSchema = z
   .object({
     enabled: z.boolean().default(true),
     mcp: z.boolean().default(true),
   })
   .default({ enabled: true, mcp: true });
 
+const ExperimentalMcpAdapterSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    mcp: z.boolean().default(true),
+  })
+  .default({ enabled: false, mcp: true });
+
 const SkillsAdapterSchema = z
   .object({
-    enabled: z.boolean().default(true),
+    enabled: z.boolean().default(false),
     skills: z.boolean().default(true),
   })
-  .default({ enabled: true, skills: true });
+  .default({ enabled: false, skills: true });
 
 const HistorySchema = z
   .object({
@@ -42,18 +49,18 @@ const HistorySchema = z
       .object({
         codex: z.boolean().default(true),
         claude: z.boolean().default(true),
-        cursor: z.boolean().default(true),
-        pi: z.boolean().default(true),
-        hermes: z.boolean().default(true),
-        openclaw: z.boolean().default(true),
+        cursor: z.boolean().default(false),
+        pi: z.boolean().default(false),
+        hermes: z.boolean().default(false),
+        openclaw: z.boolean().default(false),
       })
       .default({
         codex: true,
         claude: true,
-        cursor: true,
-        pi: true,
-        hermes: true,
-        openclaw: true,
+        cursor: false,
+        pi: false,
+        hermes: false,
+        openclaw: false,
       }),
   })
   .default({
@@ -64,10 +71,10 @@ const HistorySchema = z
     agents: {
       codex: true,
       claude: true,
-      cursor: true,
-      pi: true,
-      hermes: true,
-      openclaw: true,
+      cursor: false,
+      pi: false,
+      hermes: false,
+      openclaw: false,
     },
   });
 
@@ -87,20 +94,20 @@ export const PokoConfigSchema = z
         claude: ClaudeAdapterSchema,
         cursor: CursorAdapterSchema,
         t3code: SkillsAdapterSchema,
-        opencode: McpAdapterSchema,
+        opencode: ExperimentalMcpAdapterSchema,
         pi: SkillsAdapterSchema,
         hermes: SkillsAdapterSchema,
         openclaw: SkillsAdapterSchema,
-        codex: McpAdapterSchema,
+        codex: CoreMcpAdapterSchema,
       })
       .default({
         claude: { enabled: true, mcp: true, skills: true },
-        cursor: { enabled: true, mcp: true, legacyCursorrules: false },
-        t3code: { enabled: true, skills: true },
-        opencode: { enabled: true, mcp: true },
-        pi: { enabled: true, skills: true },
-        hermes: { enabled: true, skills: true },
-        openclaw: { enabled: true, skills: true },
+        cursor: { enabled: false, mcp: true, legacyCursorrules: false },
+        t3code: { enabled: false, skills: true },
+        opencode: { enabled: false, mcp: true },
+        pi: { enabled: false, skills: true },
+        hermes: { enabled: false, skills: true },
+        openclaw: { enabled: false, skills: true },
         codex: { enabled: true, mcp: true },
       }),
     pro: z
@@ -118,12 +125,12 @@ export const PokoConfigSchema = z
     },
     adapters: {
       claude: { enabled: true, mcp: true, skills: true },
-      cursor: { enabled: true, mcp: true, legacyCursorrules: false },
-      t3code: { enabled: true, skills: true },
-      opencode: { enabled: true, mcp: true },
-      pi: { enabled: true, skills: true },
-      hermes: { enabled: true, skills: true },
-      openclaw: { enabled: true, skills: true },
+      cursor: { enabled: false, mcp: true, legacyCursorrules: false },
+      t3code: { enabled: false, skills: true },
+      opencode: { enabled: false, mcp: true },
+      pi: { enabled: false, skills: true },
+      hermes: { enabled: false, skills: true },
+      openclaw: { enabled: false, skills: true },
       codex: { enabled: true, mcp: true },
     },
     pro: { enabledFeatures: [] },
@@ -135,10 +142,10 @@ export const PokoConfigSchema = z
       agents: {
         codex: true,
         claude: true,
-        cursor: true,
-        pi: true,
-        hermes: true,
-        openclaw: true,
+        cursor: false,
+        pi: false,
+        hermes: false,
+        openclaw: false,
       },
     },
   });

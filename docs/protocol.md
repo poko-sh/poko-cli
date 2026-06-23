@@ -99,7 +99,7 @@ Same adapter/source-context fields as `status`, plus:
     "targets": []
   },
   "historyCompatibility": {
-    "summary": "Poko syncs project context everywhere it supports...",
+    "summary": "Public alpha focuses on Codex and Claude Code full native resume...",
     "primaryRoutes": [
       "Codex ↔ Claude Code — full native chat import and resume"
     ],
@@ -163,7 +163,7 @@ Runs sync and returns file and history outcomes.
     "appCloseAgents": ["cursor"]
   },
   "historyCompatibility": {
-    "summary": "Poko syncs project context everywhere it supports...",
+    "summary": "Public alpha focuses on Codex and Claude Code full native resume...",
     "primaryRoutes": [],
     "agents": []
   },
@@ -186,8 +186,9 @@ When Cursor is selected as a native history target, the desktop app should show
 `historyCompatibility` and any Cursor-specific `warnings` before the user
 approves sync. Do not present Cursor cross-agent imports as resumable chats.
 
-The desktop app can pass `--targets claude,cursor,t3code` instead of `--all`
-when the user selects explicit destinations.
+The desktop app should use `--targets codex,claude` for the public alpha path.
+It can pass explicit limited or experimental destinations only when the user
+opts into them.
 
 ### `poko sync --global --json`
 
@@ -315,7 +316,7 @@ or `{ "sessions": [] }`. Restore requires explicit native targets via
     ]
   },
   "historyCompatibility": {
-    "summary": "Poko syncs project context everywhere it supports...",
+    "summary": "Public alpha focuses on Codex and Claude Code full native resume...",
     "primaryRoutes": [],
     "agents": []
   },

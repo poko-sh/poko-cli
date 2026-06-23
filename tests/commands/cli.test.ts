@@ -12,6 +12,28 @@ describe("cli", () => {
     expect(code).toBe(0);
     expect(logger.messages.join("\n")).toContain("poko init");
     expect(logger.messages.join("\n")).toContain("poko sync --global");
+    expect(logger.messages.join("\n")).toContain(
+      "Public alpha focus: switch between Codex and Claude Code",
+    );
+    expect(logger.messages.join("\n")).toContain(
+      "poko sync --targets codex,claude --dry-run",
+    );
+    expect(logger.messages.join("\n")).not.toContain(
+      "poko sync --global --all --dry-run",
+    );
+  });
+
+  test("shows sync help for the Codex and Claude public alpha path", async () => {
+    const logger = createMemoryLogger();
+    const code = await run(["sync", "--help"], process.cwd(), logger);
+    const output = logger.messages.join("\n");
+
+    expect(code).toBe(0);
+    expect(output).toContain("poko sync");
+    expect(output).toContain("Codex and Claude Code full native resume");
+    expect(output).toContain(
+      "--all             Sync every enabled adapter (new projects enable Codex and Claude by default)",
+    );
   });
 
   test("shows command help for doctor --help", async () => {

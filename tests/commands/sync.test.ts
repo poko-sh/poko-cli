@@ -141,7 +141,7 @@ const restoreEnv = (key: string, value: string | undefined): void => {
 };
 
 describe("poko sync", () => {
-  test("syncs every enabled adapter on --all", async () => {
+  test("syncs public alpha defaults on --all", async () => {
     const results = await runSync({
       cwd,
       all: true,
@@ -151,7 +151,11 @@ describe("poko sync", () => {
 
     const paths = results.map((result) => result.path);
     expect(paths).toContain("AGENTS.md");
-    expect(paths).toContain("opencode.json");
+    expect(paths).toContain("CLAUDE.md");
+    expect(paths).toContain(".codex/config.toml");
+    expect(paths).toContain(".mcp.json");
+    expect(paths).not.toContain("opencode.json");
+    expect(paths).not.toContain(".cursor/rules/poko.mdc");
     expect(paths).not.toContain(".gemini/settings.json");
     expect(paths).not.toContain(".aider.conf.yml");
   });
@@ -256,6 +260,43 @@ describe("poko sync", () => {
     expect(output).toContain("location:");
     expect(output).toContain("details:");
     expect(output).toContain("sessionsSkippedFromSameAgent=0");
+  });
+
+  test("Codex and Claude dry-run JSON reports the public alpha native targets", async () => {
+    await configureRepoHistoryStore();
+    await seedCodexSession();
+    await seedClaudeSession();
+
+    const report = await runSyncReport({
+      cwd,
+      targets: "codex,claude",
+      dryRun: true,
+      quiet: true,
+      logger: createMemoryLogger(),
+    });
+
+    expect(report.agents).toEqual(["codex", "claude"]);
+    expect(report.history?.sessions).toHaveLength(2);
+    expect(report.history?.nativeTargets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target: "codex",
+          sessions: 1,
+          messages: 2,
+          dryRun: true,
+        }),
+        expect.objectContaining({
+          target: "claude",
+          sessions: 1,
+          messages: 2,
+          dryRun: true,
+        }),
+      ]),
+    );
+    expect(report.historyCompatibility.primaryRoutes).toContain(
+      "Codex ↔ Claude Code — full native chat import and resume",
+    );
+    expect(report.warnings).toEqual([]);
   });
 
   test("global dry-run captures every Codex project and reports native targets", async () => {

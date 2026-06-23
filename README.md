@@ -2,11 +2,11 @@
 
 Your pocket context buddy for AI coding agents.
 
-**Same project context everywhere.** Native chat resume is strongest between **Codex** and **Claude Code**.
+**Switch between Codex and Claude Code without losing project context.**
 
-Poko keeps one canonical `.poko/` folder in your project and syncs it into the files different coding agents expect: `CLAUDE.md`, Cursor rules, `AGENTS.md`, agent skills, and local MCP configs.
+Poko keeps one canonical `.poko/` folder in your project and syncs it into the files Codex and Claude Code expect: `AGENTS.md`, `CLAUDE.md`, local MCP configs, and agent skills.
 
-It can also import project chat history into native agent stores. That does **not** mean every agent can resume every imported thread. See [History compatibility](#history-compatibility) below.
+It can also import project chat history into native agent stores. The public alpha focuses on **Codex ↔ Claude Code** because that is the primary full-resume path. Cursor and other adapters remain available, but they are limited or experimental. See [History compatibility](#history-compatibility) below.
 
 ## Quick Start
 
@@ -15,8 +15,9 @@ Install from npm (requires [Bun](https://bun.sh) >= 1.2):
 ```sh
 bunx @poko.sh/cli init
 # add .poko/rules.md, .poko/mcp.json, or other source context when you need it
-bunx @poko.sh/cli status
-bunx @poko.sh/cli sync --all
+bunx @poko.sh/cli doctor
+bunx @poko.sh/cli sync --targets codex,claude --dry-run
+bunx @poko.sh/cli sync --targets codex,claude
 ```
 
 Contributors running from source:
@@ -24,27 +25,27 @@ Contributors running from source:
 ```sh
 bun install
 bun src/cli.ts init
-bun src/cli.ts status
-bun src/cli.ts sync --all
+bun src/cli.ts doctor
+bun src/cli.ts sync --targets codex,claude --dry-run
+bun src/cli.ts sync --targets codex,claude
 ```
 
-## Demo: same conversation in Claude Code
+## Demo: same conversation in Codex and Claude Code
 
-This is the primary native resume path — Codex history imported into Claude Code
-so you can keep sending messages in the native chat.
+This is the primary public alpha path: import Codex history into Claude Code, or Claude Code history into Codex, so you can keep sending messages in the native chat.
 
 ```sh
 # 1. Initialize Poko in your project
 bunx @poko.sh/cli init
 
 # 2. Preview what would sync (no writes)
-bunx @poko.sh/cli sync --targets claude --dry-run --json
+bunx @poko.sh/cli sync --targets codex,claude --dry-run --json
 
-# 3. Sync static context + Codex chat history into Claude Code
-bunx @poko.sh/cli sync --targets claude
+# 3. Sync static context + Codex/Claude chat history
+bunx @poko.sh/cli sync --targets codex,claude
 
-# 4. Open Claude Code in this project — imported threads should appear
-#    in ~/.claude/projects/<your-project>/
+# 4. Open Codex or Claude Code in this project. Imported threads should appear
+#    in the native history for the other agent.
 ```
 
 For Cursor or other agents, check [History compatibility](#history-compatibility)
@@ -72,14 +73,9 @@ you want CLI output to hide email-like values without changing auth state.
 
 Supported agents:
 
-- `claude`
-- `cursor`
-- `t3code`
-- `opencode`
-- `pi`
-- `hermes`
-- `openclaw`
-- `codex`
+- Core alpha: `codex`, `claude`
+- Limited: `cursor` (readable imports, no cross-agent thread resume)
+- Experimental opt-ins: `opencode`, `pi`, `t3code`, `hermes`, `openclaw`
 
 Useful aliases:
 
@@ -111,13 +107,20 @@ agent outputs such as `CLAUDE.md`, `AGENTS.md`, `.cursor/`, and `opencode.json`.
 Other projects can choose to commit those generated files if that is useful for
 their team.
 
-By default, `--all` syncs every adapter enabled in `.poko/poko.json`.
+By default, new projects enable Codex and Claude Code. `--all` syncs every adapter enabled in `.poko/poko.json`, so public alpha projects use the Codex/Claude route unless you opt into more adapters.
 
-Project sync also captures project-scoped chat/session history from enabled local importers and syncs it into native agent history when that target supports it. Native chat sync currently supports Claude Code, Cursor, T3 Code, OpenCode, Pi, Hermes, OpenClaw, and Codex. **Codex ↔ Claude Code is the primary full-resume path.** Cursor imports cross-agent history for reading and creates a separate `Continue:` chat; it cannot resume another agent's thread inside the imported composer. Cursor and T3 Code write to local SQLite state, so on macOS Poko warns that it needs to close the app, asks it to quit, waits until it is closed, performs the sync, then reopens it. Use `poko sync --no-history` when you only want static context files.
+Project sync also captures project-scoped chat/session history from enabled local importers and syncs it into native agent history when that target supports it. **Codex ↔ Claude Code is the primary full-resume path.** Cursor imports cross-agent history for reading and creates a separate `Continue:` chat; it cannot resume another agent's thread inside the imported composer. Cursor and T3 Code write to local SQLite state, so on macOS Poko warns that it needs to close the app, asks it to quit, waits until it is closed, performs the sync, then reopens it. Use `poko sync --no-history` when you only want static context files.
 
-Use `--targets claude,cursor,t3code` when you want one command to sync a selected set of adapters. For project sync, selected targets receive any supported static context plus native chat history. For global sync and restore, selected targets are filtered to native-history-capable agents.
+Use `--targets codex,claude` for the public alpha path. Use explicit targets such as `--targets cursor` or `--targets opencode` when you intentionally want to test limited or experimental adapters. For project sync, selected targets receive any supported static context plus native chat history. For global sync and restore, selected targets are filtered to native-history-capable agents.
 
 `poko sync --dry-run` prints the specific project sessions it would include, each native target location, and target-specific details such as stale imports removed, files written, import commands run, and same-agent sessions skipped.
+
+## What Poko Will Not Promise Yet
+
+- It will not promise every agent can resume every imported thread.
+- It will not treat Cursor as a full native resume target; Cursor imports are readable history plus a `Continue:` chat.
+- It will not make experimental adapters part of the public alpha support promise.
+- It will not write native history without showing dry-run details and target-specific warnings.
 
 Global sync is explicit because it can touch native history for every local
 project Poko can discover:
@@ -134,11 +137,12 @@ syncs those sessions into native target history. The JSON report includes
 per-project native target results so the desktop app can preview the operation
 before a write.
 
-Cloud restore uses the same local sync engine. The desktop app downloads raw
-Poko session payloads into a temporary JSON file, then runs:
+Cloud restore uses the same local sync engine. A future desktop app or cloud
+consumer can download raw Poko session payloads into a temporary JSON file, then
+run:
 
 ```sh
-poko restore --file /path/to/sessions.json --targets claude,cursor
+poko restore --file /path/to/sessions.json --targets codex,claude
 ```
 
 `poko restore` writes the sessions back into the configured local history store
@@ -171,16 +175,16 @@ The default is `local` so raw chats do not land in git by accident. `.poko/histo
 Poko syncs **static project context** (rules, MCP, skills) to every supported adapter. **Native chat sync** varies by agent.
 
 
-| Agent          | Static context | History import | Resume imported thread | Notes                                                                      |
-| -------------- | -------------- | -------------- | ---------------------- | -------------------------------------------------------------------------- |
-| Claude Code    | Yes            | Yes            | Yes                    | Primary target for Codex history                                           |
-| Codex          | Yes            | Yes            | Yes                    | Primary source/target for native chat                                      |
-| Cursor         | Yes            | Partial        | No                     | Read-only `[History]` archive + `Continue:` chat (8 recent messages); macOS app close required |
-| T3 Code        | Yes            | Yes            | Yes                    | macOS app close required                                                   |
-| OpenCode       | Yes            | Yes            | Partial                | Uses `opencode import`; app may need refresh                               |
-| Pi             | Yes            | Yes            | Yes                    | JSONL session files                                                        |
-| Hermes Agent   | Yes            | Yes            | Partial                | SQLite session writes                                                      |
-| OpenClaw       | Yes            | Yes            | Partial                | Session JSONL writes                                                       |
+| Agent        | Alpha stage  | Static context | History import | Resume imported thread | Notes                                                                      |
+| ------------ | ------------ | -------------- | -------------- | ---------------------- | -------------------------------------------------------------------------- |
+| Claude Code  | Core         | Yes            | Yes            | Yes                    | Primary target for Codex history                                           |
+| Codex        | Core         | Yes            | Yes            | Yes                    | Primary source/target for native chat                                      |
+| Cursor       | Limited      | Yes            | Partial        | No                     | Read-only `[History]` archive + `Continue:` chat (8 recent messages); macOS app close required |
+| T3 Code      | Experimental | Yes            | Yes            | Yes                    | macOS app close required                                                   |
+| OpenCode     | Experimental | Yes            | Yes            | Partial                | Uses `opencode import`; app may need refresh                               |
+| Pi           | Experimental | Yes            | Yes            | Yes                    | JSONL session files                                                        |
+| Hermes Agent | Experimental | Yes            | Yes            | Partial                | SQLite session writes                                                      |
+| OpenClaw     | Experimental | Yes            | Yes            | Partial                | Session JSONL writes                                                       |
 
 
 **Resume imported thread** means you can send new messages and continue the conversation inside that native chat. Cursor cannot do this for cross-agent imports because it requires a Cursor server session token that Poko cannot create from Codex/Claude history. Poko creates a separate `Continue:` chat with up to 8 recent messages instead.
@@ -188,7 +192,8 @@ Poko syncs **static project context** (rules, MCP, skills) to every supported ad
 Recommended routes:
 
 - **Codex ↔ Claude Code** — full native chat sync and resume
-- **Anything → Cursor** — static context + readable history + `Continue:` chat for new work
+- **Anything → Cursor** — limited static context + readable history + `Continue:` chat for new work
+- **Experimental adapters** — opt in from `.poko/poko.json` when you want to test them
 - **`poko handoff <agent>`** — portable markdown when native resume is not available
 
 CLI and app consumers can read the machine-readable table from `poko doctor --json` (`historyCompatibility`) or `poko sync --json` (`historyCompatibility`, plus route-specific `warnings`).
@@ -211,8 +216,10 @@ poko status
 poko status --json
 ```
 
-The paid desktop app uses the JSON protocol instead of parsing terminal output:
-`poko status --json`, `poko doctor --json`, `poko sync --json`, `poko capture --json`, and `poko history --json`. See `docs/protocol.md`.
+Future app and automation consumers should use the JSON protocol instead of
+parsing terminal output: `poko status --json`, `poko doctor --json`,
+`poko sync --json`, `poko capture --json`, and `poko history --json`. See
+`docs/protocol.md`.
 
 `poko doctor` is the deeper inspection path. It captures live project history, runs native sync dry-runs, and reports route-specific warnings. It reports:
 
