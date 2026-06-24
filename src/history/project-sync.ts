@@ -8,7 +8,7 @@ import {
   type NativeHistorySyncResult,
   syncNativeHistoryTargets,
 } from "./native/index.ts";
-import { writeHistorySessions } from "./storage.ts";
+import { loadHistorySessions, writeHistorySessions } from "./storage.ts";
 import type { RawHistorySession } from "./types.ts";
 
 export type ProjectHistorySyncResult = {
@@ -25,22 +25,41 @@ export const buildProjectHistorySync = async (options: {
   dryRun?: boolean;
   logger?: Pick<Logger, "info" | "warn">;
 }): Promise<ProjectHistorySyncResult> => {
+  const store = parseStore(options.config.history.defaultStore);
+  const storedSessions = await loadHistorySessions(
+    options.root,
+    store,
+    Number.MAX_SAFE_INTEGER,
+    options.config.project.id,
+  );
   const { sessions: importedSessions, warnings: captureWarnings } =
     await captureEnabledProjectHistory(
       options.root,
       options.config,
       options.logger,
     );
-  const { sessions, skipped } = filterProjectIncarnation(
-    collapseEquivalentSessions(importedSessions),
-    options.config,
+  const { sessions: currentSessions, skipped: skippedLiveSessions } =
+    filterProjectIncarnation(
+      collapseEquivalentSessions(importedSessions),
+      options.config,
+    );
+  const sessions = collapseEquivalentSessions([
+    ...storedSessions,
+    ...currentSessions,
+  ]);
+  const acceptedSessionKeys = new Set(
+    sessions.map((session) => `${session.sourceAgent}:${session.id}`),
+  );
+  const skipped = skippedLiveSessions.filter(
+    (session) =>
+      !acceptedSessionKeys.has(`${session.sourceAgent}:${session.id}`),
   );
   const stampedSessions = stampProjectIdentity(sessions, options.config);
 
   if (!options.dryRun && stampedSessions.length > 0) {
     await writeHistorySessions(
       options.root,
-      parseStore(options.config.history.defaultStore),
+      store,
       stampedSessions,
       options.config.project.id,
     );

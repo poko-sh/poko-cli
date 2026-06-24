@@ -299,6 +299,42 @@ describe("poko sync", () => {
     expect(report.warnings).toEqual([]);
   });
 
+  test("sync includes older sessions after explicit include-previous capture", async () => {
+    await seedCodexSession();
+    await runCapture({
+      cwd,
+      agent: "codex",
+      includePrevious: true,
+      quiet: true,
+      logger: createMemoryLogger(),
+    });
+
+    const report = await runSyncReport({
+      cwd,
+      agent: "claude",
+      dryRun: true,
+      quiet: true,
+      logger: createMemoryLogger(),
+    });
+
+    expect(report.history?.skippedOlderSessions).toBe(0);
+    expect(report.history?.sessions).toEqual([
+      expect.objectContaining({
+        id: "sync-session",
+        sourceAgent: "codex",
+        messages: 2,
+      }),
+    ]);
+    expect(report.history?.nativeTargets).toEqual([
+      expect.objectContaining({
+        target: "claude",
+        sessions: 1,
+        messages: 2,
+        dryRun: true,
+      }),
+    ]);
+  });
+
   test("global dry-run captures every Codex project and reports native targets", async () => {
     const otherRoot = await makeTempDir();
 

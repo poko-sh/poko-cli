@@ -5,6 +5,16 @@ All notable changes to `@poko.sh/cli` are documented here. The format is based o
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-24
+
+### Changed
+
+- Quick start now leads with a global `poko` install while keeping `bunx` as a one-off option
+
+### Fixed
+
+- `poko sync` now honors older history sessions that were explicitly captured with `poko capture --include-previous`
+
 ## [0.2.0] - 2026-06-23
 
 ### Added
@@ -56,7 +66,8 @@ All notable changes to `@poko.sh/cli` are documented here. The format is based o
 - History compatibility reporting and portable handoffs
 - Reversible lab harness for adapter validation
 
-[Unreleased]: https://github.com/poko-sh/poko-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/poko-sh/poko-cli/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/poko-sh/poko-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/poko-sh/poko-cli/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/poko-sh/poko-cli/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/poko-sh/poko-cli/releases/tag/v0.1.0

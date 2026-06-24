@@ -10,14 +10,21 @@ It can also import project chat history into native agent stores. The public alp
 
 ## Quick Start
 
-Install from npm (requires [Bun](https://bun.sh) >= 1.2):
+Install once from npm (requires [Bun](https://bun.sh) >= 1.2):
 
 ```sh
-bunx @poko.sh/cli init
+bun add -g @poko.sh/cli
+poko init
 # add .poko/rules.md, .poko/mcp.json, or other source context when you need it
-bunx @poko.sh/cli doctor
-bunx @poko.sh/cli sync --targets codex,claude --dry-run
-bunx @poko.sh/cli sync --targets codex,claude
+poko doctor
+poko sync --targets codex,claude --dry-run
+poko sync --targets codex,claude
+```
+
+Or try it once without installing:
+
+```sh
+bunx @poko.sh/cli@latest doctor
 ```
 
 Contributors running from source:
@@ -36,13 +43,13 @@ This is the primary public alpha path: import Codex history into Claude Code, or
 
 ```sh
 # 1. Initialize Poko in your project
-bunx @poko.sh/cli init
+poko init
 
 # 2. Preview what would sync (no writes)
-bunx @poko.sh/cli sync --targets codex,claude --dry-run --json
+poko sync --targets codex,claude --dry-run --json
 
 # 3. Sync static context + Codex/Claude chat history
-bunx @poko.sh/cli sync --targets codex,claude
+poko sync --targets codex,claude
 
 # 4. Open Codex or Claude Code in this project. Imported threads should appear
 #    in the native history for the other agent.
